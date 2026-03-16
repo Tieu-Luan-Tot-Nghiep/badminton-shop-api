@@ -1,0 +1,83 @@
+// Logic cấu hình và xử lý RabbitMQ (Message Queue) trong project BadmintonShop
+
+1. Dependency (Thư viện cần thiết):
+   // Thêm thư viện Spring AMQP để làm việc với RabbitMQ
+   implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+2. Cấu hình (src/main/java/com/badminton/shop/config/RabbitMQConfig.java):
+   
+   @Configuration
+   public class RabbitMQConfig {
+       // Các hằng số định nghĩa tên Exchange, Queue và Routing Key
+       public static final String EMAIL_EXCHANGE = "email.exchange";
+       public static final String EMAIL_VERIFICATION_QUEUE = "email.verification.queue";
+       public static final String EMAIL_VERIFICATION_ROUTING_KEY = "email.verification.routingKey";
+
+       // Đăng ký Queue (Hàng đợi) - nơi chứa các tin nhắn chờ được xử lý
+       @Bean
+       public Queue emailVerificationQueue() {
+           return new Queue(EMAIL_VERIFICATION_QUEUE, true); // true = bền vững (durable), không mất khi restart RabbitMQ
+       }
+
+       // Đăng ký Exchange (Sàn giao dịch) - nơi tiếp nhận tin nhắn từ Producer và điều hướng tới Queue phù hợp
+       @Bean
+       public DirectExchange emailExchange() {
+           return new DirectExchange(EMAIL_EXCHANGE);
+       }
+
+       // Ràng buộc (Binding) Queue với Exchange thông qua Routing Key
+       @Bean
+       public Binding emailBinding(Queue emailVerificationQueue, DirectExchange emailExchange) {
+           return BindingBuilder.bind(emailVerificationQueue).to(emailExchange).with(EMAIL_VERIFICATION_ROUTING_KEY);
+       }
+
+       // Cấu hình mã hóa tin nhắn sang định dạng JSON để dễ dàng truyền tải Object
+       @Bean
+       public MessageConverter jsonMessageConverter() {
+           return new Jackson2JsonMessageConverter();
+       }
+
+       // Cấu hình RabbitTemplate để gửi tin nhắn
+       @Bean
+       public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+           RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+           rabbitTemplate.setMessageConverter(jsonMessageConverter()); // Sử dụng converter JSON đã định nghĩa ở trên
+           return rabbitTemplate;
+       }
+   }
+
+3. Logic Xử lý Tin nhắn (Consumer) (src/main/java/com/badminton/shop/modules/messaging/consumer/EmailConsumer.java):
+   
+   @Service
+   @RequiredArgsConstructor
+   @Slf4j
+   public class EmailConsumer {
+       private final EmailService emailService;
+
+       // Lắng nghe tin nhắn từ hàng đợi 'EMAIL_VERIFICATION_QUEUE'
+       @RabbitListener(queues = RabbitMQConfig.EMAIL_VERIFICATION_QUEUE)
+       public void consumeEmailVerification(EmailMessage message) {
+           log.info("Đã nhận tin nhắn gửi email xác thực cho: {}", message.getEmail());
+           try {
+               // Gọi service để gửi email thực tế (SMTP)
+               emailService.sendVerificationEmail(message.getEmail(), message.getToken());
+               log.info("Đã gửi email thành công tới: {}", message.getEmail());
+           } catch (Exception e) {
+               log.error("Gửi email thất bại tới: {}", message.getEmail(), e);
+               // Ghi chú: Trong thực tế, có thể cần cơ chế Retry hoặc chuyển vào Dead Letter Queue nếu lỗi
+           }
+       }
+   }
+
+4. Logic Gửi Tin nhắn (Producer) (Ví dụ):
+   
+   @Autowired
+   private RabbitTemplate rabbitTemplate;
+   
+   public void sendVerification(EmailMessage message) {
+       // Gửi Object message tới Exchange với Routing Key tương ứng
+       // RabbitMQ sẽ tự động đưa tin nhắn vào Queue đã được Bind trước đó
+       rabbitTemplate.convertAndSend(RabbitMQConfig.EMAIL_EXCHANGE, RabbitMQConfig.EMAIL_VERIFICATION_ROUTING_KEY, message);
+   }
+
+// Ghi chú: RabbitMQ được sử dụng để xử lý bất đồng bộ (Asynchronous). Ví dụ, khi người dùng đăng ký, hệ thống gửi tin nhắn vào RabbitMQ và phản hồi ngay cho người dùng, việc gửi email sẽ do Consumer xử lý sau đó, giúp giảm thời gian chờ (Latency) của API.

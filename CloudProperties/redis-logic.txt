@@ -1,0 +1,45 @@
+// Logic cấu hình và sử dụng Redis trong project BadmintonShop
+
+1. Dependency (Thư viện cần thiết):
+   // Thêm thư viện Spring Data Redis để làm việc với Redis
+   implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+2. Cấu hình (src/main/java/com/badminton/shop/config/RedisConfig.java):
+   
+   @Configuration
+   public class RedisConfig {
+       
+       // Tạo Bean RedisTemplate để có thể inject và sử dụng ở các Service
+       @Bean
+       public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+           RedisTemplate<String, Object> template = new RedisTemplate<>();
+           template.setConnectionFactory(connectionFactory);
+           
+           // Sử dụng StringRedisSerializer để mã hóa Key (giúp key hiển thị rõ ràng trong Redis)
+           template.setKeySerializer(new StringRedisSerializer());
+           
+           // Sử dụng GenericJackson2JsonRedisSerializer để mã hóa Value dưới dạng JSON
+           // Điều này cho phép lưu trữ các Object phức tạp vào Redis
+           template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+           
+           return template;
+       }
+   }
+
+3. Ví dụ cách sử dụng (Thường dùng để Cache dữ liệu hoặc lưu Session):
+   
+   @Autowired
+   private RedisTemplate<String, Object> redisTemplate;
+   
+   // Hàm lưu dữ liệu vào Redis với thời gian hết hạn (TTL)
+   public void saveData(String key, Object value) {
+       // Lưu dữ liệu vào Redis với khóa là 'key', giá trị là 'value' và hết hạn sau 10 phút
+       redisTemplate.opsForValue().set(key, value, Duration.ofMinutes(10));
+   }
+   
+   // Hàm lấy dữ liệu từ Redis theo khóa
+   public Object getData(String key) {
+       return redisTemplate.opsForValue().get(key);
+   }
+
+// Ghi chú: Redis giúp tăng tốc độ ứng dụng bằng cách giảm tải cho Database chính (Postgres) thông qua việc lưu trữ các dữ liệu thường xuyên truy cập vào bộ nhớ tạm (In-Memory).

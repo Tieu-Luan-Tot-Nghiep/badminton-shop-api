@@ -2,6 +2,8 @@ package com.badminton.shop.modules.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "user_addresses")
@@ -10,6 +12,8 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE user_addresses SET is_deleted = true WHERE id=?")
+@SQLRestriction("is_deleted = false")
 public class UserAddress {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,6 +38,9 @@ public class UserAddress {
     private String specificAddress;
 
     private Boolean isDefault;
+
+    @Column(nullable = false)
+    private Boolean isDeleted = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
