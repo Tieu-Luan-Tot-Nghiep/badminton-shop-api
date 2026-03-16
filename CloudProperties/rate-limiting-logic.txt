@@ -1,0 +1,31 @@
+// Tài liệu kỹ thuật: Giới hạn lưu lượng (Rate Limiting) & Khóa tài khoản (Account Lockout)
+// Công nghệ: Spring Boot, Spring Data Redis
+
+1. Giới hạn Đăng ký (Registration Limit)
+- Mục đích: Ngăn chặn việc tạo tài khoản ảo hoặc spam email xác thực.
+- Cấu hình:
+  + Cooldown: 1 yêu cầu / 30 giây (mỗi IP hoặc Email). Người dùng phải đợi ít nhất 30 giây để có thể gửi yêu cầu tiếp theo.
+  + Ngưỡng: Tối đa 5 yêu cầu / 1 phút trên mỗi IP.
+- Phản hồi: Lỗi 429 (Too Many Requests) với thông báo tiếng Việt.
+
+2. Giới hạn Đăng nhập (Login Limit)
+- Mục đích: Chống tấn công dò mật khẩu (Brute-force).
+- Cấu hình:
+  + Ngưỡng: Tối đa 5 yêu cầu / 1 phút trên mỗi IP.
+- Phản hồi: Lỗi 429 nếu vượt quá số lượng yêu cầu trong một phút.
+
+3. Logic Khóa tài khoản (Account Lockout Bonus)
+- Điều kiện: Nhập sai mật khẩu 5 lần liên tiếp.
+- Đối tượng bị khóa: Khóa theo Username (tài khoản cụ thể) VÀ khóa theo IP (ngăn chặn tấn công phân tán từ 1 máy).
+- Thời gian khóa: 15 phút.
+- Tự động Reset:
+  + Nếu đăng nhập thành công: Bộ đếm lỗi sẽ được xóa về 0.
+  + Nếu không đủ 5 lần sai trong vòng 1 tiếng: Bộ đếm sẽ tự hết hạn trong Redis.
+
+4. Các thành phần chính trong Code:
+- Exception: TooManyRequestsException (mã lỗi 429).
+- Service: RateLimitService xử lý các tác vụ increment, expire và hasKey trên Redis.
+- Controller: AuthController lấy IP từ HttpServletRequest để truyền vào tầng Service.
+- Service Implementation: AuthServiceImpl kiểm tra các điều kiện trước khi thực hiện logic nghiệp vụ chính.
+
+// Ghi chú bảo mật: Các Key trong Redis được lưu với tiền tố 'ratelimit:', 'loginfail:', 'lockout:' để dễ quản lý và tránh xung đột dữ liệu.

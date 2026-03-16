@@ -1,0 +1,199 @@
+# Auth Module API Documentation
+
+This document describes all available endpoints in the Authentication module.
+
+## Endpoints
+
+### 1. Register
+- **URL**: `/api/auth/register`
+- **Method**: `POST`
+- **Description**: Registers a new user account.
+- **Request Body**:
+  ```json
+  {
+    "username": "user123",
+    "email": "user123@example.com",
+    "password": "password123",
+    "phoneNumber": "0123456789"
+  }
+  ```
+- **Success Response** (200 OK):
+  ```json
+  {
+    "token": "jwt_token_here",
+    "username": "user123",
+    "role": "CUSTOMER"
+  }
+  ```
+
+### 2. Login
+- **URL**: `/api/auth/login`
+- **Method**: `POST`
+- **Description**: Authenticates a user and returns a JWT token.
+- **Request Body**:
+  ```json
+  {
+    "username": "user123",
+    "password": "password123"
+  }
+  ```
+- **Success Response** (200 OK):
+  ```json
+  {
+    "token": "jwt_access_token_here",
+    "refreshToken": "jwt_refresh_token_here",
+    "username": "user123",
+    "role": "CUSTOMER"
+  }
+  ```
+
+### 3. Refresh Token
+- **URL**: `/api/auth/refresh`
+- **Method**: `POST`
+- **Description**: Generates a new access token using a valid refresh token.
+- **Request Body**:
+  ```json
+  {
+    "refreshToken": "jwt_refresh_token_here"
+  }
+  ```
+- **Success Response** (200 OK):
+  ```json
+  {
+    "token": "new_jwt_access_token_here",
+    "refreshToken": "new_jwt_refresh_token_here"
+  }
+  ```
+
+### 4. Logout
+- **URL**: `/api/auth/logout`
+- **Method**: `POST`
+- **Description**: Invalidates the refresh token.
+- **Request Body**:
+  ```json
+  {
+    "refreshToken": "jwt_refresh_token_here"
+  }
+  ```
+- **Success Response** (200 OK): Empty body.
+
+### 5. Verify Email
+- **URL**: `/api/auth/verify-email`
+- **Method**: `GET`
+- **Description**: Verifies a user's email using the token and email parameters sent in the verification email.
+- **Parameters**: 
+  - `token` (String): The random UUID token.
+  - `email` (String): The user's email address.
+- **Success Response** (200 OK): "Xác thực email thành công! Bạn hiện có thể đăng nhập."
+
+### 6. Resend Verification Email
+- **URL**: `/api/auth/resend-verification`
+- **Method**: `POST`
+- **Description**: Resends a new verification token to the specified email if the account is not yet verified.
+- **Request Body**:
+  ```json
+  {
+    "email": "user123@example.com"
+  }
+  ```
+- **Success Response** (200 OK): "Đã gửi mã xác thực mới. Vui lòng kiểm tra email của bạn."
+
+### 7. Forgot Password
+- **URL**: `/api/auth/forgot-password`
+- **Method**: `POST`
+- **Description**: Sends a password reset link to the user's email.
+- **Request Body**:
+  ```json
+  {
+    "email": "user123@example.com"
+  }
+  ```
+- **Success Response** (200 OK): "Đã gửi link đặt lại mật khẩu vào email của bạn. Vui lòng kiểm tra hộp thư."
+
+### 8. Reset Password
+- **URL**: `/api/auth/reset-password`
+- **Method**: `POST`
+- **Description**: Resets the user's password using the token received in the email.
+- **Request Body**:
+  ```json
+  {
+    "token": "reset_token_here",
+    "newPassword": "new_password_123"
+  }
+  ```
+- **Success Response** (200 OK): "Đặt lại mật khẩu thành công! Vui lòng quay lại ứng dụng để đăng nhập."
+
+### 9. Change Password
+- **URL**: `/api/auth/change-password`
+- **Method**: `POST`
+- **Authentication**: Required (Bearer Token)
+- **Description**: Allows a logged-in user to change their password.
+- **Request Body**:
+  ```json
+  {
+    "oldPassword": "current_password",
+    "newPassword": "new_password_123"
+  }
+  ```
+- **Success Response** (200 OK): "Đổi mật khẩu thành công."
+
+### 10. Get Current User Profile
+- **URL**: `/api/auth/me`
+- **Method**: `GET`
+- **Authentication**: Required (Bearer Token)
+- **Description**: Returns basic information of the currently logged-in user.
+- **Success Response** (200 OK):
+  ```json
+  {
+    "id": 1,
+    "fullName": "user123",
+    "email": "user123@example.com",
+    "birthDate": "2000-01-01",
+    "avatar": "https://s3-bucket-url.com/avatar/1.png",
+    "role": "CUSTOMER"
+  }
+  ```
+
+### 11. Update User Profile
+- **URL**: `/api/auth/profile`
+- **Method**: `PUT`
+- **Authentication**: Required (Bearer Token)
+- **Description**: Updates the profile information of the currently logged-in user.
+- **Request Body**:
+  ```json
+  {
+    "fullName": "Họ và tên mới",
+    "phoneNumber": "0123456789",
+    "birthDate": "2000-01-01"
+  }
+  ```
+- **Success Response** (200 OK): "Cập nhật thông tin cá nhân thành công."
+
+### 12. Upload Avatar
+- **URL**: `/api/auth/profile/avatar`
+- **Method**: `POST`
+- **Authentication**: Required (Bearer Token)
+- **Description**: Uploads a new avatar image (max 5MB) and updates the user's profile.
+- **Request Body**: `multipart/form-data` with a file field named `file`.
+- **Success Response** (200 OK): "Cập nhật ảnh đại diện thành công."
+
+### 13. Social Login (Google/Facebook)
+- **Google URL**: `/oauth2/authorization/google`
+- **Facebook URL**: `/oauth2/authorization/facebook`
+- **Method**: `GET`
+- **Description**: Redirects the user to the provider's OAuth2 login page.
+
+### 14. Delete Account (Soft Delete)
+- **URL**: `/api/auth/account`
+- **Method**: `DELETE`
+- **Authentication**: Required (Bearer Token)
+- **Description**: Sets the user's status to INACTIVE.
+- **Success Response** (200 OK): "Tài khoản của bạn đã được vô hiệu hóa."
+
+## Error Codes
+- **400 Bad Request**: Validation errors or business logic violations.
+- **401 Unauthorized**: Invalid credentials or token expired/invalid.
+- **403 Forbidden**: Access denied or email not verified.
+- **409 Conflict**: Username or email already exists.
+- **429 Too Many Requests**: Rate limit exceeded (cooldown active).
+- **500 Internal Server Error**: Unexpected server errors.

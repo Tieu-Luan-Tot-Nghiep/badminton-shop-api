@@ -1,0 +1,52 @@
+# Address Module API Documentation
+
+## Endpoints
+
+### 1. Create Address
+- **URL**: `/api/addresses`
+- **Method**: `POST`
+- **Authentication**: Required (Bearer Token)
+- **Request Body**:
+  ```json
+  {
+    "receiverName": "Nguyễn Văn A",
+    "phoneNumber": "0987654321",
+    "province": "Hà Nội",
+    "district": "Cầu Giấy",
+    "ward": "Dịch Vọng",
+    "specificAddress": "Số 123 đường ABC",
+    "isDefault": true
+  }
+  ```
+- **Success Response** (200 OK): Address object with ID.
+
+### 2. Update Address
+- **URL**: `/api/addresses/{id}`
+- **Method**: `PUT`
+- **Authentication**: Required (Bearer Token)
+- **Request Body**: Same as Create Address.
+- **Success Response** (200 OK): Updated address object.
+
+### 3. Delete Address
+- **URL**: `/api/addresses/{id}`
+- **Method**: `DELETE`
+- **Authentication**: Required (Bearer Token)
+- **Success Response** (204 No Content).
+
+### 4. Get All Addresses
+- **URL**: `/api/addresses`
+- **Method**: `GET`
+- **Authentication**: Required (Bearer Token)
+- **Success Response** (200 OK): List of addresses.
+
+### 5. Get Address by ID
+- **URL**: `/api/addresses/{id}`
+- **Method**: `GET`
+- **Authentication**: Required (Bearer Token)
+- **Success Response** (200 OK): Address object.
+
+### 6. Set Default Address
+- **URL**: `/api/addresses/{id}/default`
+- **Method**: `PATCH`
+- **Authentication**: Required (Bearer Token)
+- **Success Response** (200 OK).
