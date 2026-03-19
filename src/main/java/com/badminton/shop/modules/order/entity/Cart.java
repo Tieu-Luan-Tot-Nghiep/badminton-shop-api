@@ -30,6 +30,11 @@ public class Cart {
     @Builder.Default
     private List<CartItem> items = new ArrayList<>();
 
+    @PrePersist
+    protected void onCreate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
