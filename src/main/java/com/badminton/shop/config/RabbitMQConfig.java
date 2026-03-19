@@ -16,6 +16,9 @@ public class RabbitMQConfig {
     public static final String EMAIL_VERIFICATION_ROUTING_KEY = "email.verification.routingKey";
     public static final String AVATAR_UPDATE_QUEUE = "avatar.update.queue";
     public static final String AVATAR_UPDATE_ROUTING_KEY = "avatar.update.routingKey";
+    public static final String CART_EXCHANGE = "cart.exchange";
+    public static final String CART_SYNC_QUEUE = "cart.sync.queue";
+    public static final String CART_SYNC_ROUTING_KEY = "cart.sync.routingKey";
 
     @Bean
     public Queue emailVerificationQueue() {
@@ -28,8 +31,18 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue cartSyncQueue() {
+        return new Queue(CART_SYNC_QUEUE, true);
+    }
+
+    @Bean
     public DirectExchange emailExchange() {
         return new DirectExchange(EMAIL_EXCHANGE);
+    }
+
+    @Bean
+    public DirectExchange cartExchange() {
+        return new DirectExchange(CART_EXCHANGE);
     }
 
     @Bean
@@ -40,6 +53,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding avatarUpdateBinding(Queue avatarUpdateQueue, DirectExchange emailExchange) {
         return BindingBuilder.bind(avatarUpdateQueue).to(emailExchange).with(AVATAR_UPDATE_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding cartSyncBinding(Queue cartSyncQueue, DirectExchange cartExchange) {
+        return BindingBuilder.bind(cartSyncQueue).to(cartExchange).with(CART_SYNC_ROUTING_KEY);
     }
 
     @Bean

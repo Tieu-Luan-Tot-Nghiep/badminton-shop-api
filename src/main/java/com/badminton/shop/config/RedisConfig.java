@@ -2,8 +2,10 @@ package com.badminton.shop.config;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -50,6 +52,8 @@ public class RedisConfig implements CachingConfigurer {
     @Bean
     public RedisSerializer<Object> redisValueSerializer() {
         ObjectMapper redisObjectMapper = JsonMapper.builder().build();
+        redisObjectMapper.registerModule(new JavaTimeModule());
+        redisObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         redisObjectMapper.activateDefaultTyping(
                 BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class).build(),
                 ObjectMapper.DefaultTyping.NON_FINAL,
