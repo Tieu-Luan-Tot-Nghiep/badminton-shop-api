@@ -1,0 +1,250 @@
+### 2.0. Search Products (Elasticsearch)
+- **URL**: `/api/search/products`
+- **Method**: `GET`
+- **Description**: Tìm kiếm sản phẩm qua chỉ mục Elasticsearch (full-text + filter + sort + phân trang).
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**:
+  - `keyword` (String, optional) — tìm theo tên/mô tả/brand/category (fuzzy search).
+  - `category` (String, slug, optional) — lọc theo danh mục.
+  - `brand` (String, slug, optional) — lọc theo thương hiệu.
+  - `minPrice`/`maxPrice` (Number, optional) — lọc khoảng giá.
+  - `activeOnly` (Boolean, default `true`) — chỉ lấy sản phẩm đang active.
+  - `sortBy` (`createdAt`, `price`, `name`; default `createdAt`).
+  - `sortDir` (`asc`/`desc`; default `desc`).
+  - `page` (int, default `0`).
+  - `size` (int, default `12`, max `100`).
+- **Success Response** (200 OK): `ProductSearchPageResponse`.
+  ```json
+  {
+    "content": [
+      {
+        "id": 100,
+        "name": "Vợt Yonex NanoFlare",
+        "slug": "yonex-nanoflare",
+        "shortDescription": "Vợt cầu lông nhẹ",
+        "thumbnailUrl": "https://cdn.example.com/vot.png",
+        "basePrice": 3500000,
+        "brandName": "Yonex",
+        "categoryName": "Vợt",
+        "isActive": true
+      }
+    ],
+    "page": 0,
+    "size": 12,
+    "totalElements": 45,
+    "totalPages": 4,
+    "last": false
+  }
+  ```
+
+### 2.1. List Products (Database)
+- **URL**: `/api/products`
+- **Method**: `GET`
+- **Description**: Trả về trang `ProductListResponse` với thông tin tối giản.
+- **Authentication**: Không yêu cầu.
+- **Notes**: Endpoint này vẫn chạy từ database (JPA). Nếu cần full-text search ưu tiên dùng `/api/search/products`.
+- **Query Parameters**:
+  - `category` (String, slug) — lọc theo danh mục.
+  - `brand` (String, slug) — lọc theo thương hiệu.
+  - `minPrice`/`maxPrice` (Number) — khoảng giá.
+  - `keyword` (String) — tìm kiếm tên hoặc mô tả ngắn.
+  - `sortBy` (`createdAt`, `price`, `name`; default `createdAt`).
+  - `sortDir` (`asc`/`desc`; default `desc`).
+  - `page` (int, default `0`).
+  - `size` (int, default `12`).
+- **Success Response** (200 OK): Spring Page of `ProductListResponse`, e.g.
+  ```json
+  {
+    "content": [
+      {
+        "id": 100,
+        "name": "Vợt Yonex NanoFlare",
+        "slug": "yonex-nanoflare",
+        "shortDescription": "Vợt cầu lông nhẹ",
+        "thumbnailUrl": "https://cdn.example.com/vot.png",
+        "basePrice": 3500000,
+        "brandName": "Yonex",
+        "categoryName": "Vợt"
+      }
+    ],
+    "pageable": {
+      "pageNumber": 0,
+      "pageSize": 12
+    },
+    "totalElements": 45,
+    "totalPages": 4
+  }
+  ```
+
+### 3.2. Get Product by Slug
+- **URL**: `/api/products/{slug}`
+- **Method**: `GET`
+- **Description**: Lấy chi tiết sản phẩm (public) theo `slug`.
+- **Authentication**: Không yêu cầu.
+- **Success Response** (200 OK): `ProductResponse` with category & brand info.
+  - `productImages` chứa các ảnh tham chiếu theo màu (`imageUrl`, `color`, `isMain`).
+  - `productVariants` cung cấp mỗi tổ hợp màu + size (`sku`, `color`, `size`, `price`, `stock`).
+
+### 3.3. Create Product
+- **URL**: `/api/products`
+- **Method**: `POST`
+- **Description**: Tạo sản phẩm mới.
+- **Authentication**: ADMIN.
+- **Request Body** (`ProductRequest`):
+  ```json
+  {
+    "name": "Giày Sân Cầu Flash",
+    "shortDescription": "Thoáng khí, chống trượt",
+    "description": "Mô tả chi tiết…",
+    "basePrice": 1200000,
+    "categoryId": 5,
+    "brandId": 2
+  }
+  ```
+- **Notes**
+  - Product metadata (name, description, price, brand, category) is created first.
+  - Manage inventory through `/api/products/{productId}/variants` (see section 3.5) and color galleries through `/api/products/{productId}/images` (see section 3.6). This separation keeps the catalog metadata lightweight while inventory/photos are added later.
+- **Success Response** (201 Created): `ProductResponse`.
+  ```json
+  {
+    "id": 101,
+    "name": "Giày Sân Cầu Flash",
+    "slug": "giay-san-cau-flash",
+    "productImages": [],
+    "productVariants": []
+  }
+  ```
+
+### 3.4. Update Product
+- **URL**: `/api/products/{id}`
+- **Method**: `PUT`
+- **Description**: Cập nhật sản phẩm theo `id`.
+- **Authentication**: ADMIN.
+- **Path Parameters**: `id`.
+- **Request Body**: `ProductRequest`.
+- **Behavior**: Cập nhật metadata (name, description, base price, brand, category). Inventory and color-specific galleries remain managed through the dedicated `/variants` and `/images` endpoints so you can keep editing those independently.
+- **Success Response** (200 OK): `ProductResponse`.
+
+### 3.5. Product Variants
+- **Description**: Mỗi variant gắn màu + size + kho nên cần CRUD riêng.
+#### 3.5.1. List Variants
+- **URL**: `/api/products/{productId}/variants`
+- **Method**: `GET`
+- **Authentication**: ADMIN.
+- **Description**: Lấy toàn bộ variants của sản phẩm.
+- **Success Response** (200 OK): array of `ProductVariantResponse`.
+#### 3.5.2. Create Variant
+- **URL**: `/api/products/{productId}/variants`
+- **Method**: `POST`
+- **Authentication**: ADMIN.
+- **Request Body** (`ProductVariantRequest`):
+  ```json
+  {
+    "sku": "FLASH-WH-38",
+    "size": "38",
+    "color": "Trắng",
+    "price": 1250000,
+    "stock": 12
+  }
+  ```
+- **Success Response** (201 Created): newly created `ProductVariantResponse`.
+#### 3.5.3. Update Variant
+- **URL**: `/api/products/{productId}/variants/{variantId}`
+- **Method**: `PUT`
+- **Authentication**: ADMIN.
+- **Request Body**: `ProductVariantRequest` (same schema as create).
+- **Success Response** (200 OK): updated `ProductVariantResponse`.
+#### 3.5.4. Delete Variant
+- **URL**: `/api/products/{productId}/variants/{variantId}`
+- **Method**: `DELETE`
+- **Authentication**: ADMIN.
+- **Description**: Xóa variant và các cart item liên quan.
+- **Success Response**: 204 No Content.
+
+### 3.6. Product Images
+- **Description**: Gallery entries are grouped by `color` and managed through these admin endpoints. Each operation requires the parent `productId`, and uploading a new image requires posting the actual file so that the same photos can be shared across all sizes for a color.
+#### 3.6.1. List Product Images
+- **URL**: `/api/products/{productId}/images`
+- **Method**: `GET`
+- **Description**: Trả về tất cả ảnh trong gallery của sản phẩm, mỗi mục có `id`, `imageUrl`, `color`, `isMain`.
+- **Authentication**: ADMIN.
+- **Success Response** (200 OK): array of `ProductImageResponse`.
+#### 3.6.2. Upload Product Image
+- **URL**: `/api/products/{productId}/images`
+- **Method**: `POST`
+- **Description**: Upload một ảnh mới cho màu cụ thể.
+- **Authentication**: ADMIN.
+- **Request**: `multipart/form-data` với các trường:
+  - `file` (required): ảnh thực tế.
+  - `color` (String, required): tên màu (ví dụ "Trắng" hoặc "Đen").
+  - `isMain` (Boolean, optional): đánh dấu ảnh đại diện cho màu đó (mặc định `false`).
+- **Success Response** (201 Created): `ProductImageResponse` với `imageUrl` khai báo đường dẫn S3.
+#### 3.6.3. Update Product Image
+- **URL**: `/api/products/{productId}/images/{imageId}`
+- **Method**: `PUT`
+- **Description**: Cập nhật metadata (màu hoặc `isMain`) của một ảnh đã tồn tại.
+- **Authentication**: ADMIN.
+- **Request Body** (`ProductImageRequest`):
+  ```json
+  {
+    "color": "Xanh",
+    "isMain": true
+  }
+  ```
+- **Success Response** (200 OK): updated `ProductImageResponse`.
+#### 3.6.4. Delete Product Image
+- **URL**: `/api/products/{productId}/images/{imageId}`
+- **Method**: `DELETE`
+- **Description**: Xóa ảnh khỏi gallery và đồng thời xoá file trên S3.
+- **Authentication**: ADMIN.
+- **Success Response**: 204 No Content.
+
+### 3.7. Upload Thumbnail
+- **URL**: `/api/products/{id}/thumbnail`
+- **Method**: `POST`
+- **Description**: Upload ảnh thumbnail mới cho sản phẩm.
+- **Authentication**: ADMIN.
+- **Request**: `multipart/form-data`, field `file`.
+- **Success Response** (200 OK): `ProductResponse` với `thumbnailUrl` mới.
+
+### 3.8. Toggle Product Status
+- **URL**: `/api/products/{id}/status`
+- **Method**: `PATCH`
+- **Description**: Bật/tắt `isActive` sản phẩm.
+- **Authentication**: ADMIN.
+- **Success Response** (200 OK): `ProductResponse` với `isActive` cập nhật.
+
+### 3.9. Delete Product
+- **URL**: `/api/products/{id}`
+- **Method**: `DELETE`
+- **Description**: Xóa sản phẩm theo `id`.
+- **Authentication**: ADMIN.
+- **Success Response**: 204 No Content.
+
+### 4.1. Reindex Products (Elasticsearch)
+- **URL**: `/api/search/products/reindex`
+- **Method**: `POST`
+- **Description**: Đồng bộ lại toàn bộ products từ database vào Elasticsearch index.
+- **Authentication**: ADMIN.
+- **Success Response** (200 OK):
+  ```json
+  {
+    "message": "Product index reindex completed"
+  }
+  ```
+
+## Search Sync (Observer Pattern)
+- Khi tạo/cập nhật/toggle status/upload thumbnail product: phát event `UPSERT`.
+- Khi xóa product: phát event `DELETE`.
+- Listener `ProductSearchSyncListener` xử lý sau commit (`AFTER_COMMIT`) để đồng bộ index Elasticsearch, tránh lệch dữ liệu khi transaction rollback.
+
+## Error Handling
+- **400 Bad Request**: Validation lỗi (BrandRequest/CategoryRequest/ProductRequest).
+- **401 Unauthorized**: Thiếu/không hợp lệ Bearer token.
+- **403 Forbidden**: User không phải `ADMIN` nhưng gọi admin endpoint.
+- **404 Not Found**: `slug` hoặc `id` không tồn tại.
+- **500 Internal Server Error**: Lỗi không mong muốn từ server.
+
+## Notes
+- `sortBy` đặc biệt: `price` map tới cột `basePrice`, `name` map tới `name`, mặc định `createdAt`.
+- Các endpoint admin yêu cầu header `Authorization: Bearer <token>` và role `ADMIN`.

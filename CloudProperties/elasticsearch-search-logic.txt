@@ -1,0 +1,39 @@
+Elasticsearch Search Logic (Observer Pattern)
+
+1) Goal
+- Tách search khỏi truy vấn SQL truyền thống để hỗ trợ full-text, fuzzy search và lọc/sort nhanh.
+- Đồng bộ dữ liệu Product -> Elasticsearch theo event sau mỗi thay đổi dữ liệu chính.
+
+2) Main Flow
+- Public search API: GET /api/search/products
+- Search service xây query bool gồm:
+  - must: multi_match trên name, shortDescription, description, brandName, categoryName (fuzziness=AUTO)
+  - filter: categorySlug, brandSlug, minPrice/maxPrice, activeOnly
+  - filter cố định: isDeleted=false
+- Trả về ProductSearchPageResponse với content + metadata phân trang.
+
+3) Observer Pattern (Event Listener)
+- Publisher: ProductServiceImpl phát ProductSearchSyncEvent với action:
+  - UPSERT: khi create/update/toggle status/upload thumbnail
+  - DELETE: khi delete product
+- Listener: ProductSearchSyncListener lắng nghe event với @TransactionalEventListener(phase = AFTER_COMMIT)
+  - UPSERT -> productSearchService.upsertProduct(productId)
+  - DELETE -> productSearchService.deleteProduct(productId)
+- Lợi ích: chỉ sync khi transaction DB commit thành công, giảm nguy cơ lệch dữ liệu.
+
+4) Reindex
+- Admin API: POST /api/search/products/reindex
+- Dùng khi:
+  - Khởi tạo index lần đầu
+  - Mapping/index bị reset
+  - Cần backfill toàn bộ dữ liệu từ DB
+
+5) Elasticsearch Cloud Environment Variables
+- ELASTICSEARCH_URIS
+- ELASTICSEARCH_API_KEY
+- ELASTICSEARCH_PRODUCTS_INDEX (optional, default: products)
+
+6) Spring Properties Mapping
+- spring.elasticsearch.uris=${ELASTICSEARCH_URIS}
+- app.search.elasticsearch.api-key=${ELASTICSEARCH_API_KEY}
+- app.search.elasticsearch.index.products=${ELASTICSEARCH_PRODUCTS_INDEX:products}

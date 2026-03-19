@@ -39,7 +39,8 @@ public class UserAddress {
 
     private Boolean isDefault;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
     private Boolean isDeleted = false;
 
     @ManyToOne(fetch = FetchType.LAZY)

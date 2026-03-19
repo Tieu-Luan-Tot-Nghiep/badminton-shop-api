@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Suggest Keywords</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --brand: #0f766e;
+      --brand-soft: #ccfbf1;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f0fdf4 0%, var(--bg) 45%, #eef2ff 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: min(760px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 20px 20px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .input-wrap {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .15s ease;
+    }
+
+    input:focus {
+      border-color: var(--brand);
+    }
+
+    button {
+      border: 0;
+      background: var(--brand);
+      color: white;
+      font-weight: 600;
+      padding: 0 16px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      background: var(--brand-soft);
+      color: #115e59;
+      border: 1px solid #99f6e4;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-weight: 600;
+    }
+
+    .list {
+      list-style: none;
+      margin: 0;
+      padding: 8px 0;
+      max-height: 380px;
+      overflow: auto;
+    }
+
+    .item {
+      padding: 12px 20px;
+      border-top: 1px solid var(--line);
+      animation: fadeIn .16s ease;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 18px 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      margin: 0;
+      padding: 14px 20px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      font-size: 16px;
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <section class="header">
+      <h1>Autocomplete Test: suggestKeywords</h1>
+      <p>Gõ từ khóa như "vợ", "yon", "lin" để kiểm tra realtime suggestions.</p>
+    </section>
+
+    <section class="input-wrap">
+      <div class="row">
+        <input id="apiBaseInput" type="text" placeholder="API Base URL (vd: http://localhost:8080)" />
+        <button id="applyApiBtn" type="button">Apply</button>
+      </div>
+      <div class="row">
+        <input id="queryInput" type="text" placeholder="Nhập từ khóa..." autocomplete="off" />
+        <button id="searchBtn" type="button">Search</button>
+      </div>
+      <div class="row">
+        <input id="sizeInput" type="number" min="1" max="20" value="8" />
+        <button id="clearBtn" type="button">Clear</button>
+      </div>
+      <div class="meta">
+        <span>Endpoint: <strong id="endpointText">/api/search/products/suggestions</strong></span>
+        <span class="pill" id="statusPill">Idle</span>
+        <span id="latencyText">Latency: -</span>
+      </div>
+    </section>
+
+    <ul id="results" class="list"></ul>
+    <div id="empty" class="empty">Chưa có dữ liệu. Bắt đầu gõ để xem gợi ý.</div>
+
+    <h2 class="section-title">Trending Test: popular searches</h2>
+
+    <section class="input-wrap">
+      <div class="row">
+        <input id="trendingDaysInput" type="number" min="1" max="30" value="7" />
+        <button id="loadTrendingBtn" type="button">Load Trending</button>
+      </div>
+      <div class="row">
+        <input id="trendingSizeInput" type="number" min="1" max="20" value="10" />
+        <button id="clearTrendingBtn" type="button">Clear</button>
+      </div>
+      <div class="meta">
+        <span>Endpoint: <strong id="trendingEndpointText">/api/search/products/trending</strong></span>
+        <span class="pill" id="trendingStatusPill">Idle</span>
+        <span id="trendingLatencyText">Latency: -</span>
+      </div>
+    </section>
+
+    <ul id="trendingResults" class="list"></ul>
+    <div id="trendingEmpty" class="empty">Bấm Load Trending để lấy top từ khóa 7 ngày gần nhất.</div>
+  </main>
+
+  <script>
+    const queryInput = document.getElementById('queryInput');
+    const sizeInput = document.getElementById('sizeInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const apiBaseInput = document.getElementById('apiBaseInput');
+    const applyApiBtn = document.getElementById('applyApiBtn');
+    const results = document.getElementById('results');
+    const empty = document.getElementById('empty');
+    const statusPill = document.getElementById('statusPill');
+    const latencyText = document.getElementById('latencyText');
+    const endpointText = document.getElementById('endpointText');
+    const trendingDaysInput = document.getElementById('trendingDaysInput');
+    const trendingSizeInput = document.getElementById('trendingSizeInput');
+    const loadTrendingBtn = document.getElementById('loadTrendingBtn');
+    const clearTrendingBtn = document.getElementById('clearTrendingBtn');
+    const trendingResults = document.getElementById('trendingResults');
+    const trendingEmpty = document.getElementById('trendingEmpty');
+    const trendingEndpointText = document.getElementById('trendingEndpointText');
+    const trendingStatusPill = document.getElementById('trendingStatusPill');
+    const trendingLatencyText = document.getElementById('trendingLatencyText');
+
+    let debounceTimer = null;
+
+    function defaultApiBaseUrl() {
+      if (window.location.port === '8080') {
+        return `${window.location.protocol}//${window.location.host}`;
+      }
+      return 'http://localhost:8080';
+    }
+
+    function normalizeBaseUrl(value) {
+      const trimmed = (value || '').trim();
+      if (!trimmed) {
+        return '';
+      }
+      return trimmed.replace(/\/$/, '');
+    }
+
+    function getApiBaseUrl() {
+      const fromInput = normalizeBaseUrl(apiBaseInput.value);
+      if (fromInput) {
+        return fromInput;
+      }
+      return normalizeBaseUrl(defaultApiBaseUrl());
+    }
+
+    function updateEndpointPreview() {
+      const base = getApiBaseUrl();
+      endpointText.textContent = `${base}/api/search/products/suggestions`;
+      trendingEndpointText.textContent = `${base}/api/search/products/trending`;
+    }
+
+    function setStatus(text) {
+      statusPill.textContent = text;
+    }
+
+    function setTrendingStatus(text) {
+      trendingStatusPill.textContent = text;
+    }
+
+    function renderSuggestions(items) {
+      results.innerHTML = '';
+      if (!items || items.length === 0) {
+        empty.style.display = 'block';
+        empty.textContent = 'Không có suggestion phù hợp.';
+        return;
+      }
+
+      empty.style.display = 'none';
+      for (const item of items) {
+        const li = document.createElement('li');
+        li.className = 'item';
+        li.textContent = item;
+        results.appendChild(li);
+      }
+    }
+
+    function renderTrending(items) {
+      trendingResults.innerHTML = '';
+      if (!items || items.length === 0) {
+        trendingEmpty.style.display = 'block';
+        trendingEmpty.textContent = 'Chưa có dữ liệu trending.';
+        return;
+      }
+
+      trendingEmpty.style.display = 'none';
+      for (const item of items) {
+        const li = document.createElement('li');
+        li.className = 'item';
+        li.textContent = `${item.keyword} (${item.count})`;
+        trendingResults.appendChild(li);
+      }
+    }
+
+    async function runSearch() {
+      const query = queryInput.value.trim();
+      const size = Math.min(Math.max(Number(sizeInput.value || 8), 1), 20);
+      const base = getApiBaseUrl();
+
+      if (!query) {
+        results.innerHTML = '';
+        empty.style.display = 'block';
+        empty.textContent = 'Nhập query để bắt đầu.';
+        setStatus('Idle');
+        latencyText.textContent = 'Latency: -';
+        return;
+      }
+
+      setStatus('Loading...');
+      const startedAt = performance.now();
+
+      try {
+        const endpoint = `${base}/api/search/products/suggestions?query=${encodeURIComponent(query)}&size=${size}`;
+        const res = await fetch(endpoint);
+        const elapsed = (performance.now() - startedAt).toFixed(1);
+        latencyText.textContent = `Latency: ${elapsed} ms`;
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+
+        const data = await res.json();
+        renderSuggestions(data.suggestions || []);
+        setStatus('OK');
+      } catch (err) {
+        setStatus('Error');
+        results.innerHTML = '';
+        empty.style.display = 'block';
+        empty.textContent = `Lỗi gọi API: ${err.message}`;
+      }
+    }
+
+    async function loadTrending() {
+      const days = Math.min(Math.max(Number(trendingDaysInput.value || 7), 1), 30);
+      const size = Math.min(Math.max(Number(trendingSizeInput.value || 10), 1), 20);
+      const base = getApiBaseUrl();
+
+      setTrendingStatus('Loading...');
+      const startedAt = performance.now();
+
+      try {
+        const endpoint = `${base}/api/search/products/trending?days=${days}&size=${size}`;
+        const res = await fetch(endpoint);
+        const elapsed = (performance.now() - startedAt).toFixed(1);
+        trendingLatencyText.textContent = `Latency: ${elapsed} ms`;
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+
+        const data = await res.json();
+        renderTrending(data.items || []);
+        setTrendingStatus('OK');
+      } catch (err) {
+        setTrendingStatus('Error');
+        trendingResults.innerHTML = '';
+        trendingEmpty.style.display = 'block';
+        trendingEmpty.textContent = `Lỗi gọi API: ${err.message}`;
+      }
+    }
+
+    queryInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(runSearch, 220);
+    });
+
+    searchBtn.addEventListener('click', runSearch);
+
+    applyApiBtn.addEventListener('click', () => {
+      apiBaseInput.value = normalizeBaseUrl(apiBaseInput.value);
+      updateEndpointPreview();
+      setStatus('Idle');
+      setTrendingStatus('Idle');
+    });
+
+    clearBtn.addEventListener('click', () => {
+      queryInput.value = '';
+      results.innerHTML = '';
+      empty.style.display = 'block';
+      empty.textContent = 'Chưa có dữ liệu. Bắt đầu gõ để xem gợi ý.';
+      setStatus('Idle');
+      latencyText.textContent = 'Latency: -';
+      queryInput.focus();
+    });
+
+    loadTrendingBtn.addEventListener('click', loadTrending);
+
+    clearTrendingBtn.addEventListener('click', () => {
+      trendingResults.innerHTML = '';
+      trendingEmpty.style.display = 'block';
+      trendingEmpty.textContent = 'Bấm Load Trending để lấy top từ khóa 7 ngày gần nhất.';
+      setTrendingStatus('Idle');
+      trendingLatencyText.textContent = 'Latency: -';
+    });
+
+    apiBaseInput.value = normalizeBaseUrl(defaultApiBaseUrl());
+    updateEndpointPreview();
+  </script>
+</body>
+</html>

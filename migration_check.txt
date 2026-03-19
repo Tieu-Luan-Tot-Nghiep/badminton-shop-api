@@ -1,0 +1,62 @@
+
+> Task :compileJava
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\product\entity\Product.java:35: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<String> images = new ArrayList<>();
+                         ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\product\entity\Product.java:53: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<ProductVariant> variants = new ArrayList<>();
+                                 ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\product\entity\Product.java:56: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<Review> reviews = new ArrayList<>();
+                         ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\User.java:60: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private Boolean isActive = true;
+                    ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\User.java:63: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private Boolean isEmailVerified = false;
+                    ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\User.java:66: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private Boolean isDeleted = false;
+                    ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\User.java:75: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<UserAddress> addresses = new ArrayList<>();
+                              ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\User.java:81: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<Order> orders = new ArrayList<>();
+                        ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\User.java:84: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<Review> reviews = new ArrayList<>();
+                         ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\auth\entity\UserAddress.java:43: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private Boolean isDeleted = false;
+                    ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\order\entity\Order.java:73: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<OrderItem> items = new ArrayList<>();
+                            ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\order\entity\Order.java:76: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<OrderHistory> histories = new ArrayList<>();
+                               ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\product\entity\ProductVariant.java:48: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<CartItem> cartItems = new ArrayList<>();
+                           ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\product\entity\ProductVariant.java:51: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<OrderItem> orderItems = new ArrayList<>();
+                            ^
+D:\TLTN\BE\BadmintonShop\src\main\java\com\badminton\shop\modules\order\entity\Cart.java:30: warning: @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+    private List<CartItem> items = new ArrayList<>();
+                           ^
+15 warnings
+
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :compileTestJava UP-TO-DATE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :test
+
+[Incubating] Problems report is available at: file:///D:/TLTN/BE/BadmintonShop/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 7s
+4 actionable tasks: 2 executed, 2 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
