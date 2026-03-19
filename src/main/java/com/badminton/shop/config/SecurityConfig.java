@@ -4,6 +4,7 @@ import com.badminton.shop.modules.auth.security.oauth2.CustomOAuth2UserService;
 import com.badminton.shop.modules.auth.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.badminton.shop.security.JwtAuthenticationEntryPoint;
 import com.badminton.shop.security.JwtAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,16 +39,24 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/login",
-                                "/api/auth/register",
-                                "/api/auth/refresh",
-                                "/api/auth/verify-email",
-                                "/api/auth/forgot-password",
-                                "/api/auth/reset-password",
+                            "/api/auth/login",
+                            "/api/auth/register",
+                            "/api/auth/refresh",
+                            "/api/auth/verify-email",
+                            "/api/auth/forgot-password",
+                            "/api/auth/reset-password",
                                 "/oauth2/**",
                                 "/auth/**",
-                                "/reset-password.html"
+                                "/reset-password.html",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs.yaml",
+                                "/webjars/**"
                         ).permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/search/products/**", "/api/products/search/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -70,3 +79,5 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 }
+
+

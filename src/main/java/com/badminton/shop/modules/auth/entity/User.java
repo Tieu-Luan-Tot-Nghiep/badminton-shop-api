@@ -56,14 +56,17 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
-    @Column(nullable = false)
-    private Boolean isActive;
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private Boolean isActive = true;
 
-    @Column(nullable = false)
-    private Boolean isEmailVerified;
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean isEmailVerified = false;
 
-    @Column(nullable = false)
-    private Boolean isDeleted;
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean isDeleted = false;
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -72,16 +75,8 @@ public class User {
 
     // Relationships
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<UserAddress> addresses = new ArrayList<>();
-
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Cart cart;
-
-    @OneToMany(mappedBy = "user")
-    private List<Order> orders = new ArrayList<>();
-
-    @OneToMany(mappedBy = "user")
-    private List<Review> reviews = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

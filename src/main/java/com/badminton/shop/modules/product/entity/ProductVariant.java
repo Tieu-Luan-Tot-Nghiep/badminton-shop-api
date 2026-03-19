@@ -1,13 +1,9 @@
 package com.badminton.shop.modules.product.entity;
 
-import com.badminton.shop.modules.inventory.entity.Inventory;
-import com.badminton.shop.modules.order.entity.CartItem;
-import com.badminton.shop.modules.order.entity.OrderItem;
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "product_variants")
@@ -16,6 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE product_variants SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class ProductVariant {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,7 +24,9 @@ public class ProductVariant {
 
     private String weight;    // VD: 3U/4U
     private String gripSize;  // VD: G4/G5
+    @Column(nullable = false)
     private String size;      // Quần áo, giày
+    @Column(nullable = false)
     private String color;     // Màu sắc
 
     @Column(nullable = false)
@@ -35,18 +35,15 @@ public class ProductVariant {
     @Column(nullable = false)
     private Double price;
 
-    private String imageUrl;
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer stock = 0;
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private Boolean isDeleted = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
-
-    @OneToOne(mappedBy = "variant", cascade = CascadeType.ALL)
-    private Inventory inventory;
-
-    @OneToMany(mappedBy = "variant")
-    private List<CartItem> cartItems = new ArrayList<>();
-
-    @OneToMany(mappedBy = "variant")
-    private List<OrderItem> orderItems = new ArrayList<>();
 }
