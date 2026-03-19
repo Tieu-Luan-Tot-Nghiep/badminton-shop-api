@@ -67,6 +67,18 @@ public class ProductController {
         return ResponseEntity.ok(productService.getPublicProductBySlug(slug));
     }
 
+    @GetMapping("/featured")
+    public ResponseEntity<List<ProductListResponse>> getFeaturedProducts(
+            @RequestParam(defaultValue = "8") int limit) {
+        return ResponseEntity.ok(productService.getFeaturedProducts(limit));
+    }
+
+    @GetMapping("/new")
+    public ResponseEntity<List<ProductListResponse>> getNewestProducts(
+            @RequestParam(defaultValue = "8") int limit) {
+        return ResponseEntity.ok(productService.getNewestProducts(limit));
+    }
+
     // ===== Admin APIs =====
 
     @PostMapping

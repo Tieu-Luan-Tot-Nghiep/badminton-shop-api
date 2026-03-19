@@ -56,6 +56,7 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
                             .requestMatchers(HttpMethod.GET, "/api/search/products/**", "/api/products/search/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/featured", "/api/products/new").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
                         .anyRequest().authenticated()
                 )

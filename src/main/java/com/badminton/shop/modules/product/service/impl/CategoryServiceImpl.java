@@ -9,6 +9,9 @@ import com.badminton.shop.modules.product.entity.Category;
 import com.badminton.shop.modules.product.repository.CategoryRepository;
 import com.badminton.shop.modules.product.service.CategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +25,14 @@ import java.util.stream.Collectors;
 @Transactional
 public class CategoryServiceImpl implements CategoryService {
 
+        private static final String CACHE_CATEGORY_TREE = "categoryTree";
+        private static final String CACHE_CATEGORY_BY_SLUG = "categoryBySlug";
+
     private final CategoryRepository categoryRepository;
 
     @Override
     @Transactional(readOnly = true)
+        @Cacheable(cacheNames = CACHE_CATEGORY_TREE, key = "'all'")
     public List<CategoryResponse> getAllCategoriesTree() {
         List<Category> rootCategories = categoryRepository.findAllByParentCategoryIsNull();
         return rootCategories.stream()
@@ -35,6 +42,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CACHE_CATEGORY_BY_SLUG, key = "#slug")
     public CategoryResponse getCategoryBySlug(String slug) {
         Category category = categoryRepository.findBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với slug: " + slug));
@@ -42,6 +50,10 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_CATEGORY_TREE, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_CATEGORY_BY_SLUG, allEntries = true)
+    })
     public CategoryResponse createCategory(CategoryRequest request) {
         Category parentCategory = null;
 
@@ -69,6 +81,10 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_CATEGORY_TREE, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_CATEGORY_BY_SLUG, allEntries = true)
+    })
     public CategoryResponse updateCategory(Long id, CategoryRequest request) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với id: " + id));
@@ -96,6 +112,10 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_CATEGORY_TREE, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_CATEGORY_BY_SLUG, allEntries = true)
+    })
     public void deleteCategory(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với id: " + id));

@@ -26,6 +26,10 @@ public interface ProductService {
 
     ProductResponse getPublicProductBySlug(String slug);
 
+    List<ProductListResponse> getFeaturedProducts(int limit);
+
+    List<ProductListResponse> getNewestProducts(int limit);
+
     // Admin APIs
     ProductResponse createProduct(ProductRequest request);
 

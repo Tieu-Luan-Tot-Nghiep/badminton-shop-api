@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -123,5 +124,42 @@ class ProductServiceImplTest {
         assertEquals(501L, event.productId());
         assertEquals(ProductSearchSyncAction.DELETE, event.action());
         assertFalse(product.getVariants().isEmpty());
+    }
+
+    @Test
+    void getFeaturedProducts_ShouldUseSafeLimitAndMapResponse() {
+        Product featured = Product.builder()
+                .id(11L)
+                .name("Featured Product")
+                .slug("featured-product")
+                .basePrice(BigDecimal.valueOf(1_000_000))
+                .brand(Brand.builder().name("Yonex").build())
+                .category(Category.builder().name("Racket").build())
+                .build();
+
+        when(productRepository.findFeaturedProducts(PageRequest.of(0, 50))).thenReturn(List.of(featured));
+
+        var results = productService.getFeaturedProducts(999);
+
+        assertEquals(1, results.size());
+        assertEquals("Featured Product", results.getFirst().getName());
+        verify(productRepository).findFeaturedProducts(PageRequest.of(0, 50));
+    }
+
+    @Test
+    void getNewestProducts_ShouldUseDefaultLowerBoundLimit() {
+        Product newest = Product.builder()
+                .id(22L)
+                .name("Newest Product")
+                .slug("newest-product")
+                .build();
+
+        when(productRepository.findNewestProducts(PageRequest.of(0, 1))).thenReturn(List.of(newest));
+
+        var results = productService.getNewestProducts(0);
+
+        assertEquals(1, results.size());
+        assertEquals("Newest Product", results.getFirst().getName());
+        verify(productRepository).findNewestProducts(PageRequest.of(0, 1));
     }
 }

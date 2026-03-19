@@ -23,8 +23,12 @@ import com.badminton.shop.modules.search.event.ProductSearchSyncEvent;
 import com.badminton.shop.utils.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +47,9 @@ import java.util.stream.Collectors;
 @Transactional
 @Slf4j
 public class ProductServiceImpl implements ProductService {
+
+    private static final String CACHE_FEATURED = "productFeatured";
+    private static final String CACHE_NEWEST = "productNewest";
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -81,9 +88,33 @@ public class ProductServiceImpl implements ProductService {
         return mapToResponse(product);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CACHE_FEATURED, key = "'limit:' + #limit")
+    public List<ProductListResponse> getFeaturedProducts(int limit) {
+        int safeLimit = normalizeLimit(limit);
+        return productRepository.findFeaturedProducts(PageRequest.of(0, safeLimit)).stream()
+                .map(this::mapToListResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CACHE_NEWEST, key = "'limit:' + #limit")
+    public List<ProductListResponse> getNewestProducts(int limit) {
+        int safeLimit = normalizeLimit(limit);
+        return productRepository.findNewestProducts(PageRequest.of(0, safeLimit)).stream()
+                .map(this::mapToListResponse)
+                .toList();
+    }
+
     // ===== Admin APIs =====
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductResponse createProduct(ProductRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -111,6 +142,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -149,6 +184,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductVariantResponse createProductVariant(Long productId, ProductVariantRequest request) {
         Product product = findProductOrThrow(productId);
         ProductVariant variant = ProductVariant.builder()
@@ -165,6 +204,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductVariantResponse updateProductVariant(Long productId, Long variantId, ProductVariantRequest request) {
         Product product = findProductOrThrow(productId);
         ProductVariant variant = findProductVariant(product, variantId);
@@ -179,6 +222,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public void deleteProductVariant(Long productId, Long variantId) {
         Product product = findProductOrThrow(productId);
         ProductVariant variant = findProductVariant(product, variantId);
@@ -188,6 +235,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductResponse uploadThumbnail(Long id, MultipartFile file) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -207,6 +258,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductResponse toggleStatus(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -219,6 +274,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -292,6 +351,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductImageResponse uploadProductImage(Long productId, ProductImageRequest request, MultipartFile file) {
         Product product = findProductOrThrow(productId);
         if (file == null || file.isEmpty()) {
@@ -317,6 +380,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public ProductImageResponse updateProductImage(Long productId, Long imageId, ProductImageRequest request) {
         Product product = findProductOrThrow(productId);
         ProductImage image = findProductImage(product, imageId);
@@ -327,6 +394,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+        })
     public void deleteProductImage(Long productId, Long imageId) {
         Product product = findProductOrThrow(productId);
         ProductImage image = findProductImage(product, imageId);
@@ -433,5 +504,9 @@ public class ProductServiceImpl implements ProductService {
 
     private void publishProductSearchSyncEvent(Long productId, ProductSearchSyncAction action) {
         eventPublisher.publishEvent(new ProductSearchSyncEvent(productId, action));
+    }
+
+    private int normalizeLimit(int limit) {
+        return Math.min(Math.max(limit, 1), 50);
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -77,4 +78,26 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                                         AND b.isDeleted = false
                                                 """)
                 Optional<Product> findPublicProductBySlug(@Param("slug") String slug);
+
+                @Query("""
+                                                SELECT p FROM Product p
+                                                JOIN p.category c
+                                                JOIN p.brand b
+                                                WHERE p.isActive = true
+                                                        AND c.isDeleted = false
+                                                        AND b.isDeleted = false
+                                                ORDER BY p.updatedAt DESC, p.id DESC
+                                                """)
+                List<Product> findFeaturedProducts(Pageable pageable);
+
+                @Query("""
+                                                SELECT p FROM Product p
+                                                JOIN p.category c
+                                                JOIN p.brand b
+                                                WHERE p.isActive = true
+                                                        AND c.isDeleted = false
+                                                        AND b.isDeleted = false
+                                                ORDER BY p.createdAt DESC, p.id DESC
+                                                """)
+                List<Product> findNewestProducts(Pageable pageable);
 }
