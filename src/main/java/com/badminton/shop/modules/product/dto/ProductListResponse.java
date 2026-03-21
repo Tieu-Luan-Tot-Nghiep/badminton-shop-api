@@ -19,6 +19,7 @@ public class ProductListResponse {
     private String shortDescription;
     private String thumbnailUrl;
     private BigDecimal basePrice;
+    private Double rate;
     private String brandName;
     private String categoryName;
 }

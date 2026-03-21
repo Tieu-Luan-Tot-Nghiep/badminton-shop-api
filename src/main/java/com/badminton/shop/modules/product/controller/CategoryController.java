@@ -1,5 +1,6 @@
 package com.badminton.shop.modules.product.controller;
 
+import com.badminton.shop.common.dto.ApiResponse;
 import com.badminton.shop.modules.product.dto.CategoryRequest;
 import com.badminton.shop.modules.product.dto.CategoryResponse;
 import com.badminton.shop.modules.product.service.CategoryService;
@@ -20,33 +21,34 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> getAllCategories() {
-        return ResponseEntity.ok(categoryService.getAllCategoriesTree());
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
+        return ResponseEntity.ok(ApiResponse.success("Categories fetched successfully.", categoryService.getAllCategoriesTree()));
     }
 
     @GetMapping("/{slug}")
-    public ResponseEntity<CategoryResponse> getCategoryBySlug(@PathVariable String slug) {
-        return ResponseEntity.ok(categoryService.getCategoryBySlug(slug));
+    public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryBySlug(@PathVariable String slug) {
+        return ResponseEntity.ok(ApiResponse.success("Category fetched successfully.", categoryService.getCategoryBySlug(slug)));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
-        return new ResponseEntity<>(categoryService.createCategory(request), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(@Valid @RequestBody CategoryRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Category created successfully.", categoryService.createCategory(request)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<CategoryResponse> updateCategory(
+    public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
             @Valid @RequestBody CategoryRequest request) {
-        return ResponseEntity.ok(categoryService.updateCategory(id, request));
+        return ResponseEntity.ok(ApiResponse.success("Category updated successfully.", categoryService.updateCategory(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Object>> deleteCategory(@PathVariable Long id) {
         categoryService.deleteCategory(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Category deleted successfully.", null));
     }
 }

@@ -42,4 +42,14 @@ public class Promotion {
     private LocalDateTime expiryDate;
 
     private Boolean isActive;
+
+    @PrePersist
+    protected void onCreate() {
+        if (currentUsage == null) {
+            currentUsage = 0;
+        }
+        if (isActive == null) {
+            isActive = Boolean.TRUE;
+        }
+    }
 }

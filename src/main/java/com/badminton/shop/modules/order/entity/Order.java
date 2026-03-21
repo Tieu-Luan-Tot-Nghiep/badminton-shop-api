@@ -44,6 +44,9 @@ public class Order {
     @Column(nullable = false)
     private Double totalAmount;
 
+    @Column(nullable = false)
+    private Double discountAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
@@ -83,6 +86,7 @@ public class Order {
         updatedAt = LocalDateTime.now();
         if (status == null) status = OrderStatus.PENDING;
         if (paymentStatus == null) paymentStatus = PaymentStatus.PENDING;
+        if (discountAmount == null) discountAmount = 0.0d;
     }
 
     @PreUpdate

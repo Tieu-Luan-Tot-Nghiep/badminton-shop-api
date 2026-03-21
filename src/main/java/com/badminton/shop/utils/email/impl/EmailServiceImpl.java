@@ -99,4 +99,27 @@ public class EmailServiceImpl implements EmailService {
             throw new RuntimeException("Failed to send forgot password email", e);
         }
     }
+
+    @Override
+    public void sendOrderCancellationEmail(String to, String orderCode, String reason) {
+        MimeMessage message = mailSender.createMimeMessage();
+        try {
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(to);
+            helper.setSubject("Đơn hàng đã được hủy - Badminton Shop");
+
+            String content = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: auto;\">"
+                    + "<h2 style=\"color:#2c3e50\">Thông báo hủy đơn hàng</h2>"
+                    + "<p>Đơn hàng <b>" + orderCode + "</b> của bạn đã được hủy thành công.</p>"
+                    + "<p><b>Lý do:</b> " + (reason == null ? "Không có" : reason) + "</p>"
+                    + "<p>Nếu bạn đã thanh toán trước, bộ phận CSKH/Kế toán sẽ liên hệ để xử lý hoàn tiền theo chính sách.</p>"
+                    + "<p>Cảm ơn bạn đã mua sắm tại Badminton Shop.</p>"
+                    + "</div>";
+
+            helper.setText(content, true);
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Failed to send order cancellation email", e);
+        }
+    }
 }

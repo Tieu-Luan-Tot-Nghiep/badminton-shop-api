@@ -1,5 +1,6 @@
 package com.badminton.shop.modules.product.controller;
 
+import com.badminton.shop.common.dto.ApiResponse;
 import com.badminton.shop.modules.product.dto.PagedResponse;
 import com.badminton.shop.modules.product.dto.ProductImageRequest;
 import com.badminton.shop.modules.product.dto.ProductImageResponse;
@@ -37,7 +38,7 @@ public class ProductController {
     // ===== Public APIs =====
 
     @GetMapping
-    public ResponseEntity<PagedResponse<ProductListResponse>> getProducts(
+    public ResponseEntity<ApiResponse<PagedResponse<ProductListResponse>>> getProducts(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) BigDecimal minPrice,
@@ -53,132 +54,144 @@ public class ProductController {
 
         Page<ProductListResponse> products = productService.getPublicProducts(
             category, brand, minPrice, maxPrice, keyword, pageable);
-        return ResponseEntity.ok(PagedResponse.from(products));
+        return ResponseEntity.ok(ApiResponse.success("Products fetched successfully.", PagedResponse.from(products)));
         }
 
     @GetMapping("/search/existsBySlug")
-    public ResponseEntity<Map<String, Boolean>> checkSlug(@RequestParam String slug) {
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> checkSlug(@RequestParam String slug) {
         boolean exists = productService.existsBySlug(slug);
-        return ResponseEntity.ok(Collections.singletonMap("exists", exists));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Slug availability checked successfully.",
+                Collections.singletonMap("exists", exists)
+        ));
     }
 
-    @GetMapping("/{slug}")
-    public ResponseEntity<ProductResponse> getProductBySlug(@PathVariable String slug) {
-        return ResponseEntity.ok(productService.getPublicProductBySlug(slug));
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<ProductResponse>> getProductById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Product fetched successfully.", productService.getPublicProductById(id)));
     }
 
     @GetMapping("/featured")
-    public ResponseEntity<List<ProductListResponse>> getFeaturedProducts(
+    public ResponseEntity<ApiResponse<List<ProductListResponse>>> getFeaturedProducts(
             @RequestParam(defaultValue = "8") int limit) {
-        return ResponseEntity.ok(productService.getFeaturedProducts(limit));
+        return ResponseEntity.ok(ApiResponse.success("Featured products fetched successfully.", productService.getFeaturedProducts(limit)));
     }
 
     @GetMapping("/new")
-    public ResponseEntity<List<ProductListResponse>> getNewestProducts(
+    public ResponseEntity<ApiResponse<List<ProductListResponse>>> getNewestProducts(
             @RequestParam(defaultValue = "8") int limit) {
-        return ResponseEntity.ok(productService.getNewestProducts(limit));
+        return ResponseEntity.ok(ApiResponse.success("Newest products fetched successfully.", productService.getNewestProducts(limit)));
     }
 
     // ===== Admin APIs =====
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
-        return new ResponseEntity<>(productService.createProduct(request), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(@Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Product created successfully.", productService.createProduct(request)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductResponse> updateProduct(
+    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody ProductRequest request) {
-        return ResponseEntity.ok(productService.updateProduct(id, request));
+        return ResponseEntity.ok(ApiResponse.success("Product updated successfully.", productService.updateProduct(id, request)));
     }
 
     @PostMapping("/{id}/thumbnail")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductResponse> uploadThumbnail(
+    public ResponseEntity<ApiResponse<ProductResponse>> uploadThumbnail(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(productService.uploadThumbnail(id, file));
+        return ResponseEntity.ok(ApiResponse.success("Product thumbnail uploaded successfully.", productService.uploadThumbnail(id, file)));
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductResponse> toggleStatus(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.toggleStatus(id));
+    public ResponseEntity<ApiResponse<ProductResponse>> toggleStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Product status toggled successfully.", productService.toggleStatus(id)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Object>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Product deleted successfully.", null));
     }
 
     @GetMapping("/{productId}/variants")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<ProductVariantResponse>> getProductVariants(@PathVariable Long productId) {
-        return ResponseEntity.ok(productService.getProductVariants(productId));
+    public ResponseEntity<ApiResponse<List<ProductVariantResponse>>> getProductVariants(@PathVariable Long productId) {
+        return ResponseEntity.ok(ApiResponse.success("Product variants fetched successfully.", productService.getProductVariants(productId)));
     }
 
     @PostMapping("/{productId}/variants")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductVariantResponse> createProductVariant(
+    public ResponseEntity<ApiResponse<ProductVariantResponse>> createProductVariant(
             @PathVariable Long productId,
             @Valid @RequestBody ProductVariantRequest request) {
-        return new ResponseEntity<>(productService.createProductVariant(productId, request), HttpStatus.CREATED);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Product variant created successfully.", productService.createProductVariant(productId, request)));
     }
 
     @PutMapping("/{productId}/variants/{variantId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductVariantResponse> updateProductVariant(
+    public ResponseEntity<ApiResponse<ProductVariantResponse>> updateProductVariant(
             @PathVariable Long productId,
             @PathVariable Long variantId,
             @Valid @RequestBody ProductVariantRequest request) {
-        return ResponseEntity.ok(productService.updateProductVariant(productId, variantId, request));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Product variant updated successfully.",
+                productService.updateProductVariant(productId, variantId, request)
+        ));
     }
 
     @DeleteMapping("/{productId}/variants/{variantId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteProductVariant(
+    public ResponseEntity<ApiResponse<Object>> deleteProductVariant(
             @PathVariable Long productId,
             @PathVariable Long variantId) {
         productService.deleteProductVariant(productId, variantId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Product variant deleted successfully.", null));
     }
 
     @GetMapping("/{productId}/images")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<ProductImageResponse>> getProductImages(@PathVariable Long productId) {
-        return ResponseEntity.ok(productService.getProductImages(productId));
+    public ResponseEntity<ApiResponse<List<ProductImageResponse>>> getProductImages(@PathVariable Long productId) {
+        return ResponseEntity.ok(ApiResponse.success("Product images fetched successfully.", productService.getProductImages(productId)));
     }
 
     @PostMapping(value = "/{productId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductImageResponse> uploadProductImage(
+    public ResponseEntity<ApiResponse<ProductImageResponse>> uploadProductImage(
             @PathVariable Long productId,
             @ModelAttribute @Valid ProductImageRequest request,
             @RequestParam("file") MultipartFile file) {
-        return new ResponseEntity<>(productService.uploadProductImage(productId, request, file), HttpStatus.CREATED);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Product image uploaded successfully.", productService.uploadProductImage(productId, request, file)));
     }
 
     @PutMapping("/{productId}/images/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProductImageResponse> updateProductImage(
+    public ResponseEntity<ApiResponse<ProductImageResponse>> updateProductImage(
             @PathVariable Long productId,
             @PathVariable Long imageId,
             @Valid @RequestBody ProductImageRequest request) {
-        return ResponseEntity.ok(productService.updateProductImage(productId, imageId, request));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Product image updated successfully.",
+                productService.updateProductImage(productId, imageId, request)
+        ));
     }
 
     @DeleteMapping("/{productId}/images/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteProductImage(
+    public ResponseEntity<ApiResponse<Object>> deleteProductImage(
             @PathVariable Long productId,
             @PathVariable Long imageId) {
         productService.deleteProductImage(productId, imageId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Product image deleted successfully.", null));
     }
 
     // ===== Helpers =====

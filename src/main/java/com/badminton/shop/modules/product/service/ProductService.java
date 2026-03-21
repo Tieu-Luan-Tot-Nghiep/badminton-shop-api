@@ -24,7 +24,7 @@ public interface ProductService {
 
     boolean existsBySlug(String slug);
 
-    ProductResponse getPublicProductBySlug(String slug);
+    ProductResponse getPublicProductById(Long id);
 
     List<ProductListResponse> getFeaturedProducts(int limit);
 

@@ -1,5 +1,6 @@
 package com.badminton.shop.modules.product.dto;
 
+import com.badminton.shop.modules.review.dto.response.ReviewResponse;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -34,4 +35,5 @@ public class ProductResponse {
 
     private List<ProductImageResponse> productImages;
     private List<ProductVariantResponse> productVariants;
+    private List<ReviewResponse> latestReviews;
 }
