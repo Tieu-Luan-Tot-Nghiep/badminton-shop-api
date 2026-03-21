@@ -1,5 +1,6 @@
 package com.badminton.shop.modules.search.controller;
 
+import com.badminton.shop.common.dto.ApiResponse;
 import com.badminton.shop.modules.search.dto.ProductSearchPageResponse;
 import com.badminton.shop.modules.search.dto.ProductSearchSuggestionResponse;
 import com.badminton.shop.modules.search.dto.ProductSearchTrendingResponse;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -34,7 +34,7 @@ public class ProductSearchController {
     private final ProductSearchService productSearchService;
 
     @GetMapping
-    public ResponseEntity<ProductSearchPageResponse> searchProducts(
+    public ResponseEntity<ApiResponse<ProductSearchPageResponse>> searchProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String brand,
@@ -50,53 +50,56 @@ public class ProductSearchController {
         ProductSearchPageResponse response = productSearchService.searchProducts(
                 keyword, category, brand, minPrice, maxPrice, sortBy, sortDir, page, size, activeOnly, useSemantic
         );
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Product search completed successfully.", response));
     }
 
     @PostMapping("/reindex")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, String>> reindexProducts() {
+    public ResponseEntity<ApiResponse<Map<String, String>>> reindexProducts() {
         productSearchService.reindexAllProducts();
-        return ResponseEntity.ok(Map.of("message", "Product index reindex completed"));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Product index reindex completed",
+                Map.of("result", "ok")
+        ));
     }
 
     @PostMapping(value = "/by-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ProductSearchPageResponse> searchProductsByImage(
-            @RequestPart("image") MultipartFile image,
+    public ResponseEntity<ApiResponse<ProductSearchPageResponse>> searchProductsByImage(
+            @RequestParam("image") MultipartFile image,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "true") Boolean activeOnly
     ) {
         ProductSearchPageResponse response = productSearchService.searchProductsByImage(image, page, size, activeOnly);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Image search completed successfully.", response));
     }
 
     @GetMapping("/similar")
-    public ResponseEntity<ProductSearchPageResponse> suggestSimilarProducts(
+    public ResponseEntity<ApiResponse<ProductSearchPageResponse>> suggestSimilarProducts(
             @RequestParam Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "true") Boolean activeOnly
     ) {
         ProductSearchPageResponse response = productSearchService.suggestSimilarProducts(productId, page, size, activeOnly);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Similar product suggestions fetched successfully.", response));
     }
 
     @GetMapping("/suggestions")
-    public ResponseEntity<ProductSearchSuggestionResponse> suggestKeywords(
+    public ResponseEntity<ApiResponse<ProductSearchSuggestionResponse>> suggestKeywords(
             @RequestParam String query,
             @RequestParam(defaultValue = "8") int size
     ) {
         ProductSearchSuggestionResponse response = productSearchService.suggestKeywords(query, size);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Keyword suggestions fetched successfully.", response));
     }
 
     @GetMapping("/trending")
-    public ResponseEntity<ProductSearchTrendingResponse> getTrendingSearches(
+    public ResponseEntity<ApiResponse<ProductSearchTrendingResponse>> getTrendingSearches(
             @RequestParam(defaultValue = "7") int days,
             @RequestParam(defaultValue = "10") int size
     ) {
         ProductSearchTrendingResponse response = productSearchService.getTrendingSearches(days, size);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Trending searches fetched successfully.", response));
     }
 }

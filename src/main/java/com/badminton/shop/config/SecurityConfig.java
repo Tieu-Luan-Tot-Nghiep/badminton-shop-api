@@ -55,7 +55,12 @@ public class SecurityConfig {
                                 "/v3/api-docs.yaml",
                                 "/webjars/**"
                         ).permitAll()
+                                .requestMatchers("/api/inventory/system/**").hasRole("ADMIN")
+                                .requestMatchers("/api/inventory/admin/**").hasRole("ADMIN")
+                                .requestMatchers(HttpMethod.GET, "/api/reviews/my").authenticated()
                             .requestMatchers(HttpMethod.GET, "/api/search/products/**", "/api/products/search/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/orders/vnpay-return", "/api/orders/vnpay-ipn").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/reviews/*", "/api/reviews/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/featured", "/api/products/new").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
                         .anyRequest().authenticated()

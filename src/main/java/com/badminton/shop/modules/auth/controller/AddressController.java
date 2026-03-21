@@ -1,10 +1,12 @@
 package com.badminton.shop.modules.auth.controller;
 
+import com.badminton.shop.common.dto.ApiResponse;
 import com.badminton.shop.modules.auth.dto.AddressRequest;
 import com.badminton.shop.modules.auth.dto.AddressResponse;
 import com.badminton.shop.modules.auth.service.AddressService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,37 +21,51 @@ public class AddressController {
     private final AddressService addressService;
 
     @PostMapping
-    public ResponseEntity<AddressResponse> createAddress(@Valid @RequestBody AddressRequest request, Principal principal) {
-        return ResponseEntity.ok(addressService.createAddress(principal.getName(), request));
+    public ResponseEntity<ApiResponse<AddressResponse>> createAddress(@Valid @RequestBody AddressRequest request, Principal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(
+                        HttpStatus.CREATED,
+                        "Address created successfully.",
+                        addressService.createAddress(principal.getName(), request)
+                ));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AddressResponse> updateAddress(
+    public ResponseEntity<ApiResponse<AddressResponse>> updateAddress(
             @PathVariable Long id,
             @Valid @RequestBody AddressRequest request,
             Principal principal) {
-        return ResponseEntity.ok(addressService.updateAddress(id, principal.getName(), request));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Address updated successfully.",
+                addressService.updateAddress(id, principal.getName(), request)
+        ));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteAddress(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<ApiResponse<Object>> deleteAddress(@PathVariable Long id, Principal principal) {
         addressService.deleteAddress(id, principal.getName());
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Address deleted successfully.", null));
     }
 
     @GetMapping
-    public ResponseEntity<List<AddressResponse>> getAllAddresses(Principal principal) {
-        return ResponseEntity.ok(addressService.getAllAddresses(principal.getName()));
+    public ResponseEntity<ApiResponse<List<AddressResponse>>> getAllAddresses(Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Addresses fetched successfully.",
+                addressService.getAllAddresses(principal.getName())
+        ));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AddressResponse> getAddressById(@PathVariable Long id, Principal principal) {
-        return ResponseEntity.ok(addressService.getAddressById(id, principal.getName()));
+    public ResponseEntity<ApiResponse<AddressResponse>> getAddressById(@PathVariable Long id, Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Address fetched successfully.",
+                addressService.getAddressById(id, principal.getName())
+        ));
     }
 
     @PatchMapping("/{id}/default")
-    public ResponseEntity<Void> setDefaultAddress(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<ApiResponse<Object>> setDefaultAddress(@PathVariable Long id, Principal principal) {
         addressService.setDefaultAddress(id, principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Default address updated successfully.", null));
     }
 }

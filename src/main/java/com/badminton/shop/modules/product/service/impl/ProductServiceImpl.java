@@ -17,6 +17,9 @@ import com.badminton.shop.modules.product.entity.ProductVariant;
 import com.badminton.shop.modules.product.repository.BrandRepository;
 import com.badminton.shop.modules.product.repository.CategoryRepository;
 import com.badminton.shop.modules.product.repository.ProductRepository;
+import com.badminton.shop.modules.review.dto.response.ReviewResponse;
+import com.badminton.shop.modules.review.entity.Review;
+import com.badminton.shop.modules.review.repository.ReviewRepository;
 import com.badminton.shop.modules.product.service.ProductService;
 import com.badminton.shop.modules.search.event.ProductSearchSyncAction;
 import com.badminton.shop.modules.search.event.ProductSearchSyncEvent;
@@ -55,6 +58,7 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final CartItemRepository cartItemRepository;
+    private final ReviewRepository reviewRepository;
     private final S3Service s3Service;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -81,10 +85,11 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public ProductResponse getPublicProductBySlug(String slug) {
-        Product product = productRepository.findPublicProductBySlug(slug)
+    public ProductResponse getPublicProductById(Long id) {
+        Product product = productRepository.findById(id)
+                .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Không tìm thấy sản phẩm với slug: " + slug));
+                        "Không tìm thấy sản phẩm với id: " + id));
         return mapToResponse(product);
     }
 
@@ -407,6 +412,11 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductResponse mapToResponse(Product product) {
+        List<ReviewResponse> latestReviews = reviewRepository.findTop3ByProductIdOrderByCreatedAtDesc(product.getId())
+            .stream()
+            .map(this::mapToReviewResponse)
+            .toList();
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -426,6 +436,21 @@ public class ProductServiceImpl implements ProductService {
                 .brandSlug(product.getBrand() != null ? product.getBrand().getSlug() : null)
                 .productImages(mapToImageResponses(product))
                 .productVariants(mapToVariantResponses(product))
+                .latestReviews(latestReviews)
+                .build();
+    }
+
+    private ReviewResponse mapToReviewResponse(Review review) {
+        return ReviewResponse.builder()
+                .id(review.getId())
+                .rating(review.getRating())
+                .comment(review.getComment())
+                .createdAt(review.getCreatedAt())
+                .userId(review.getUser() != null ? review.getUser().getId() : null)
+                .username(review.getUser() != null ? review.getUser().getUsername() : null)
+                .productId(review.getProduct() != null ? review.getProduct().getId() : null)
+                .productName(review.getProduct() != null ? review.getProduct().getName() : null)
+                .orderItemId(review.getOrderItem() != null ? review.getOrderItem().getId() : null)
                 .build();
     }
 
@@ -437,9 +462,18 @@ public class ProductServiceImpl implements ProductService {
                 .shortDescription(product.getShortDescription())
                 .thumbnailUrl(product.getThumbnailUrl())
                 .basePrice(product.getBasePrice())
+                .rate(resolveProductRate(product.getId()))
                 .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .build();
+    }
+
+    private Double resolveProductRate(Long productId) {
+        Double avgRating = reviewRepository.averageRatingByProductId(productId);
+        if (avgRating == null) {
+            return 0.0d;
+        }
+        return Math.round(avgRating * 100.0d) / 100.0d;
     }
 
     private List<ProductImageResponse> mapToImageResponses(Product product) {
