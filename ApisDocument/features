@@ -183,6 +183,25 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 
 ## 12) MODULE MESSAGING (RABBITMQ DTO + CONSUMERS)
 
+### 12.0 Chat realtime (WebSocket + STOMP + MongoDB)
+- Tao/Lay phong chat cua customer (`GET /api/chat/rooms/me`) theo rule 1 customer = 1 room
+- Gui/nhan tin nhan realtime 2 chieu Customer <-> Admin (STOMP)
+- Luu lich su chat vao MongoDB qua RabbitMQ persist event pipeline
+- Lay lich su tin nhan theo phong co paging (`GET /api/chat/rooms/{roomId}/messages?page=0&size=20`)
+- Admin inbox: danh sach tat ca room, sap xep theo room vua nhan tin gan nhat (`GET /api/chat/admin/inbox`)
+- Upload file/anh dinh kem qua HTTP (`POST /api/chat/upload`) roi gui URL qua websocket
+- Read receipt (Da xem): danh dau da doc theo room (`POST /api/chat/rooms/{roomId}/read` + STOMP read event)
+- Unread count/cham do:
+- Lay unread count qua REST (`GET /api/chat/unread-count`)
+- Realtime unread qua STOMP channel cho customer/admin
+- STOMP channels da san sang:
+- Send: `/app/chat.send`, `/app/chat.read`
+- Subscribe room: `/topic/chat.room.{roomId}`
+- Subscribe read receipt: `/topic/chat.room.{roomId}.read`
+- Admin inbox realtime: `/topic/chat.admin.inbox`
+- Admin unread realtime: `/topic/chat.admin.unread`
+- Customer unread realtime: `/user/queue/chat.unread`
+
 ### 12.1 Message contracts
 - EmailMessage
 - AvatarUpdateMessage
@@ -191,6 +210,7 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 - InventoryCommandMessage
 - OrderCancelledEvent
 - RefundRequiredMessage
+- ChatMessagePersistEvent
 
 ### 12.2 Consumers
 - Email consumer
@@ -200,6 +220,7 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 - Inventory command consumer
 - Order cancelled consumer (rollback inventory)
 - Refund required consumer (ghi nhan luong hoan tien)
+- Chat message persist consumer (luu MongoDB + broadcast realtime)
 
 ## 13) MODULE PAYMENT
 
@@ -211,7 +232,9 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 - Global exception handler theo format thong nhat
 - JWT + role-based authorization
 - Redis cache cho mot so nghiep vu (search/promotion/...)
+- MongoDB cho chat history
 - RabbitMQ event-driven cho cac luong bat dong bo
+- WebSocket + STOMP cho realtime chat
 - Scheduler auto-cancel VNPAY qua han
 - Ho tro upload file (avatar, product thumbnail, product images)
 - Tai lieu API theo tung module trong thu muc `ApisDocument`

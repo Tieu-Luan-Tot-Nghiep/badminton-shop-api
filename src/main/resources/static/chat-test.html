@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Test</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 20px;
+      background: #f6f8fb;
+      color: #1f2937;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    h1 { margin-top: 0; }
+    label { display: block; margin-top: 10px; font-weight: 600; }
+    input, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin-top: 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    textarea { min-height: 80px; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .btn-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+    button { cursor: pointer; }
+    button.primary { background: #2563eb; color: #fff; border: none; }
+    button.secondary { background: #111827; color: #fff; border: none; }
+    button.warn { background: #b91c1c; color: #fff; border: none; }
+    #log {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      min-height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+    }
+    .hint { color: #374151; font-size: 13px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Chat Test Page</h1>
+
+  <div class="card">
+    <label>JWT Token</label>
+    <textarea id="token" placeholder="Paste Bearer token without prefix Bearer"></textarea>
+
+    <div class="row">
+      <div>
+        <label>WebSocket URL</label>
+        <input id="wsUrl" value="http://localhost:8080/ws-chat" />
+      </div>
+      <div>
+        <label>REST Base URL</label>
+        <input id="apiBaseUrl" value="http://localhost:8080" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Room ID</label>
+        <input id="roomId" placeholder="67dcf8e4a973df2f0cbf98a1" />
+      </div>
+      <div></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" onclick="connectWs()">Connect</button>
+      <button class="warn" onclick="disconnectWs()">Disconnect</button>
+      <button class="secondary" onclick="markRead()">Mark Read</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Text Message</label>
+    <input id="message" placeholder="Shop oi, em can doi tra" />
+    <button class="primary" style="margin-top:12px" onclick="sendText()">Send TEXT</button>
+  </div>
+
+  <div class="card">
+    <label>Upload Attachments (max 10 files, total <= 5MB)</label>
+    <input id="files" type="file" multiple />
+    <div class="hint">API: POST /api/chat/upload (field name: files)</div>
+    <button class="secondary" style="margin-top:12px" onclick="uploadFiles()">Upload Files</button>
+    <label>Latest Uploaded URLs (for IMAGE/FILE message)</label>
+    <textarea id="uploadResult" readonly></textarea>
+  </div>
+
+  <div class="card">
+    <h3>Logs</h3>
+    <div id="log"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  <script>
+    let stompClient = null;
+
+    function log(message) {
+      const logEl = document.getElementById("log");
+      const now = new Date().toLocaleTimeString();
+      logEl.textContent += `[${now}] ${message}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function getAuthHeaders() {
+      const raw = document.getElementById("token").value.trim();
+      const token = raw.replace(/^Bearer\s+/i, "");
+      if (!token) return {};
+      return { Authorization: `Bearer ${token}` };
+    }
+
+    function connectWs() {
+      const wsUrl = document.getElementById("wsUrl").value.trim();
+      const roomId = document.getElementById("roomId").value.trim();
+      if (!roomId) {
+        log("Room ID is required before connect.");
+        return;
+      }
+
+      const socket = new SockJS(wsUrl);
+      stompClient = Stomp.over(socket);
+      stompClient.debug = () => {};
+
+      stompClient.connect(getAuthHeaders(), () => {
+        log("STOMP connected.");
+
+        stompClient.subscribe(`/topic/chat.room.${roomId}`, msg => {
+          log(`ROOM MSG: ${msg.body}`);
+        });
+
+        stompClient.subscribe(`/topic/chat.room.${roomId}.read`, msg => {
+          log(`READ RECEIPT: ${msg.body}`);
+        });
+
+        stompClient.subscribe(`/user/queue/chat.sent`, msg => {
+          log(`SENT ACK: ${msg.body}`);
+        });
+
+        stompClient.subscribe(`/user/queue/chat.unread`, msg => {
+          log(`UNREAD: ${msg.body}`);
+        });
+      }, (error) => {
+        log(`STOMP error: ${error}`);
+      });
+    }
+
+    function disconnectWs() {
+      if (stompClient) {
+        stompClient.disconnect(() => log("Disconnected."));
+      }
+    }
+
+    function sendText() {
+      if (!stompClient || !stompClient.connected) {
+        log("Connect WS first.");
+        return;
+      }
+
+      const roomId = document.getElementById("roomId").value.trim();
+      const content = document.getElementById("message").value.trim();
+      if (!roomId || !content) {
+        log("Room ID and message content are required.");
+        return;
+      }
+
+      const payload = {
+        roomId,
+        messageType: "TEXT",
+        content
+      };
+
+      stompClient.send("/app/chat.send", {}, JSON.stringify(payload));
+      log(`SENT TEXT: ${JSON.stringify(payload)}`);
+    }
+
+    function markRead() {
+      if (!stompClient || !stompClient.connected) {
+        log("Connect WS first.");
+        return;
+      }
+
+      const roomId = document.getElementById("roomId").value.trim();
+      if (!roomId) {
+        log("Room ID is required.");
+        return;
+      }
+
+      const payload = { roomId };
+      stompClient.send("/app/chat.read", {}, JSON.stringify(payload));
+      log(`MARK READ: ${JSON.stringify(payload)}`);
+    }
+
+    async function uploadFiles() {
+      const apiBaseUrl = document.getElementById("apiBaseUrl").value.trim();
+      const fileInput = document.getElementById("files");
+      const files = Array.from(fileInput.files || []);
+      if (files.length === 0) {
+        log("Please choose at least one file.");
+        return;
+      }
+
+      if (files.length > 10) {
+        log("Too many files. Max is 10.");
+        return;
+      }
+
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      const maxSize = 5 * 1024 * 1024;
+      if (totalSize > maxSize) {
+        log("Total file size exceeds 5MB.");
+        return;
+      }
+
+      const formData = new FormData();
+      files.forEach(file => formData.append("files", file));
+
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/chat/upload`, {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+            Accept: "application/json"
+          },
+          body: formData
+        });
+
+        const contentType = res.headers.get("content-type") || "";
+        const bodyText = await res.text();
+
+        if (!contentType.includes("application/json")) {
+          log(`UPLOAD ERROR (${res.status}): Response is not JSON. Body preview: ${bodyText.slice(0, 300)}`);
+          return;
+        }
+
+        let json;
+        try {
+          json = JSON.parse(bodyText);
+        } catch (err) {
+          log(`UPLOAD ERROR (${res.status}): Invalid JSON response. Body preview: ${bodyText.slice(0, 300)}`);
+          return;
+        }
+
+        if (!res.ok) {
+          log(`UPLOAD ERROR (${res.status}): ${JSON.stringify(json)}`);
+          return;
+        }
+
+        const urls = (json.data || []).map(item => item.fileUrl).join("\n");
+        document.getElementById("uploadResult").value = urls;
+        log(`UPLOAD OK: ${JSON.stringify(json.data)}`);
+      } catch (error) {
+        log(`UPLOAD EXCEPTION: ${error}`);
+      }
+    }
+  </script>
+</body>
+</html>

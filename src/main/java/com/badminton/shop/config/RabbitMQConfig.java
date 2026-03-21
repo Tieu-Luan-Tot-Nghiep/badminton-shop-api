@@ -30,6 +30,9 @@ public class RabbitMQConfig {
     public static final String ORDER_CANCELLED_ROUTING_KEY = "order.cancelled.routingKey";
     public static final String REFUND_REQUIRED_QUEUE = "order.refund-required.queue";
     public static final String REFUND_REQUIRED_ROUTING_KEY = "order.refund-required.routingKey";
+    public static final String CHAT_EXCHANGE = "chat.exchange";
+    public static final String CHAT_MESSAGE_PERSIST_QUEUE = "chat.message.persist.queue";
+    public static final String CHAT_MESSAGE_PERSIST_ROUTING_KEY = "chat.message.persist.routingKey";
 
     @Bean
     public Queue emailVerificationQueue() {
@@ -67,6 +70,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue chatMessagePersistQueue() {
+        return new Queue(CHAT_MESSAGE_PERSIST_QUEUE, true);
+    }
+
+    @Bean
     public DirectExchange emailExchange() {
         return new DirectExchange(EMAIL_EXCHANGE);
     }
@@ -89,6 +97,11 @@ public class RabbitMQConfig {
     @Bean
     public DirectExchange orderExchange() {
         return new DirectExchange(ORDER_EXCHANGE);
+    }
+
+    @Bean
+    public DirectExchange chatExchange() {
+        return new DirectExchange(CHAT_EXCHANGE);
     }
 
     @Bean
@@ -124,6 +137,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding refundRequiredBinding(Queue refundRequiredQueue, DirectExchange orderExchange) {
         return BindingBuilder.bind(refundRequiredQueue).to(orderExchange).with(REFUND_REQUIRED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding chatMessagePersistBinding(Queue chatMessagePersistQueue, DirectExchange chatExchange) {
+        return BindingBuilder.bind(chatMessagePersistQueue).to(chatExchange).with(CHAT_MESSAGE_PERSIST_ROUTING_KEY);
     }
 
     @Bean
