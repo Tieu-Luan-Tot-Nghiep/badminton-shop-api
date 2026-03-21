@@ -39,7 +39,7 @@ public class InventoryServiceImpl implements InventoryService {
         boolean allAvailable = true;
 
         for (InventoryLineRequest item : request.getItems()) {
-            Inventory inventory = ensureInventory(item.getVariantId(), false);
+            Inventory inventory = ensureInventory(item.getVariantId(), false, false);
             int available = inventory.getAvailableQuantity();
             boolean ok = available >= item.getQuantity();
             if (!ok) {
@@ -66,7 +66,7 @@ public class InventoryServiceImpl implements InventoryService {
 
         List<SystemInventoryLineResponse> lines = new ArrayList<>();
         for (InventoryLineRequest item : request.getItems()) {
-            Inventory inventory = ensureInventory(item.getVariantId(), true);
+            Inventory inventory = ensureInventory(item.getVariantId(), true, true);
             inventory.setAvailableQuantity(inventory.getAvailableQuantity() - item.getQuantity());
             inventory.setReservedQuantity(inventory.getReservedQuantity() + item.getQuantity());
             syncVariantStockWithAvailable(inventory);
@@ -89,7 +89,7 @@ public class InventoryServiceImpl implements InventoryService {
         List<SystemInventoryLineResponse> lines = new ArrayList<>();
 
         for (InventoryLineRequest item : request.getItems()) {
-            Inventory inventory = ensureInventory(item.getVariantId(), true);
+            Inventory inventory = ensureInventory(item.getVariantId(), true, true);
             if (inventory.getReservedQuantity() < item.getQuantity()) {
                 throw new IllegalArgumentException("Not enough reserved quantity for variantId=" + item.getVariantId());
             }
@@ -156,7 +156,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public InventorySnapshotResponse stockIn(String operator, StockInRequest request) {
-        Inventory inventory = ensureInventory(request.getVariantId(), true);
+        Inventory inventory = ensureInventory(request.getVariantId(), true, true);
         inventory.setAvailableQuantity(inventory.getAvailableQuantity() + request.getQuantity());
         syncVariantStockWithAvailable(inventory);
         inventoryRepository.save(inventory);
@@ -169,7 +169,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public InventorySnapshotResponse stockOut(String operator, StockOutRequest request) {
-        Inventory inventory = ensureInventory(request.getVariantId(), true);
+        Inventory inventory = ensureInventory(request.getVariantId(), true, true);
         if (inventory.getAvailableQuantity() < request.getQuantity()) {
             throw new IllegalArgumentException("Not enough available stock for stock-out.");
         }
@@ -186,7 +186,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public InventorySnapshotResponse stocktakeAdjust(String operator, StocktakeAdjustmentRequest request) {
-        Inventory inventory = ensureInventory(request.getVariantId(), true);
+        Inventory inventory = ensureInventory(request.getVariantId(), true, true);
         int currentAvailable = inventory.getAvailableQuantity();
         int targetAvailable = request.getActualAvailableQuantity();
         int delta = targetAvailable - currentAvailable;
@@ -207,7 +207,7 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     @Transactional(readOnly = true)
     public InventoryLedgerResponse getLedger(Long variantId, int page, int size) {
-        Inventory inventory = ensureInventory(variantId, false);
+        Inventory inventory = ensureInventory(variantId, false, false);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(safePage, safeSize);
@@ -240,21 +240,25 @@ public class InventoryServiceImpl implements InventoryService {
 
     private void precheckAvailable(SystemInventoryRequest request) {
         for (InventoryLineRequest item : request.getItems()) {
-            Inventory inventory = ensureInventory(item.getVariantId(), true);
+            Inventory inventory = ensureInventory(item.getVariantId(), true, true);
             if (inventory.getAvailableQuantity() < item.getQuantity()) {
                 throw new IllegalArgumentException("Insufficient inventory for variantId=" + item.getVariantId());
             }
         }
     }
 
-    private Inventory ensureInventory(Long variantId, boolean withLock) {
+    private Inventory ensureInventory(Long variantId, boolean withLock, boolean createIfMissing) {
         if (withLock) {
             return inventoryRepository.findWithLockByVariantId(variantId)
-                    .orElseGet(() -> createInventoryFromVariant(variantId));
+                    .orElseGet(() -> createIfMissing
+                            ? createInventoryFromVariant(variantId)
+                            : buildTransientInventoryFromVariant(variantId));
         }
 
         return inventoryRepository.findByVariantId(variantId)
-                .orElseGet(() -> createInventoryFromVariant(variantId));
+                .orElseGet(() -> createIfMissing
+                        ? createInventoryFromVariant(variantId)
+                        : buildTransientInventoryFromVariant(variantId));
     }
 
     private Inventory createInventoryFromVariant(Long variantId) {
@@ -269,6 +273,18 @@ public class InventoryServiceImpl implements InventoryService {
                 .build();
 
         return inventoryRepository.save(inventory);
+    }
+
+    private Inventory buildTransientInventoryFromVariant(Long variantId) {
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Variant not found with id: " + variantId));
+
+        return Inventory.builder()
+                .variant(variant)
+                .availableQuantity(variant.getStock() == null ? 0 : variant.getStock())
+                .reservedQuantity(0)
+                .lowStockThreshold(DEFAULT_LOW_STOCK_THRESHOLD)
+                .build();
     }
 
     private void syncVariantStockWithAvailable(Inventory inventory) {
