@@ -88,6 +88,17 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Order cancelled successfully.", response));
     }
 
+    @PostMapping("/admin/{orderCode}/confirm-cod")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmCodOrder(
+            Principal principal,
+            @PathVariable String orderCode,
+            @RequestParam(required = false) String note
+    ) {
+        OrderResponse response = orderService.confirmCodOrder(orderCode, principal.getName(), note);
+        return ResponseEntity.ok(ApiResponse.success("COD order confirmed successfully.", response));
+    }
+
     @PostMapping("/{orderCode}/returns")
     public ResponseEntity<ApiResponse<ReturnRequestResponse>> createReturnRequest(
             Principal principal,

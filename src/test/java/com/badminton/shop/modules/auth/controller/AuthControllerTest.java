@@ -145,7 +145,7 @@ class AuthControllerTest {
 
     @Test
     void forgotPassword_ReturnsWrappedResponse() throws Exception {
-        doNothing().when(authService).forgotPassword(anyString());
+                doNothing().when(authService).forgotPassword(anyString(), anyString());
 
         mockMvc.perform(post("/api/auth/forgot-password")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -258,7 +258,7 @@ class AuthControllerTest {
 
     @Test
     void resendVerification_ReturnsWrappedResponse() throws Exception {
-        doNothing().when(authService).resendVerification(anyString());
+                doNothing().when(authService).resendVerification(anyString(), anyString());
 
         mockMvc.perform(post("/api/auth/resend-verification")
                         .contentType(MediaType.APPLICATION_JSON)

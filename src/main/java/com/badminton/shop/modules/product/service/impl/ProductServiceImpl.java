@@ -1,7 +1,11 @@
 package com.badminton.shop.modules.product.service.impl;
 
 import com.badminton.shop.exception.ResourceNotFoundException;
+import com.badminton.shop.modules.auth.entity.User;
+import com.badminton.shop.modules.auth.repository.UserRepository;
 import com.badminton.shop.modules.order.repository.CartItemRepository;
+import com.badminton.shop.modules.product.dto.ProductCompareItemResponse;
+import com.badminton.shop.modules.product.dto.ProductCompareResponse;
 import com.badminton.shop.modules.product.dto.ProductImageRequest;
 import com.badminton.shop.modules.product.dto.ProductImageResponse;
 import com.badminton.shop.modules.product.dto.ProductListResponse;
@@ -9,14 +13,18 @@ import com.badminton.shop.modules.product.dto.ProductRequest;
 import com.badminton.shop.modules.product.dto.ProductResponse;
 import com.badminton.shop.modules.product.dto.ProductVariantRequest;
 import com.badminton.shop.modules.product.dto.ProductVariantResponse;
+import com.badminton.shop.modules.product.dto.WishlistItemResponse;
 import com.badminton.shop.modules.product.entity.Brand;
 import com.badminton.shop.modules.product.entity.Category;
 import com.badminton.shop.modules.product.entity.Product;
 import com.badminton.shop.modules.product.entity.ProductImage;
 import com.badminton.shop.modules.product.entity.ProductVariant;
+import com.badminton.shop.modules.product.entity.ProductWishlist;
 import com.badminton.shop.modules.product.repository.BrandRepository;
 import com.badminton.shop.modules.product.repository.CategoryRepository;
 import com.badminton.shop.modules.product.repository.ProductRepository;
+import com.badminton.shop.modules.product.repository.ProductVariantRepository;
+import com.badminton.shop.modules.product.repository.ProductWishlistRepository;
 import com.badminton.shop.modules.review.dto.response.ReviewResponse;
 import com.badminton.shop.modules.review.entity.Review;
 import com.badminton.shop.modules.review.repository.ReviewRepository;
@@ -39,8 +47,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -57,6 +67,9 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
+    private final ProductVariantRepository productVariantRepository;
+    private final ProductWishlistRepository productWishlistRepository;
+    private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
     private final ReviewRepository reviewRepository;
     private final S3Service s3Service;
@@ -111,6 +124,102 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findNewestProducts(PageRequest.of(0, safeLimit)).stream()
                 .map(this::mapToListResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductCompareResponse compareVariants(List<Long> variantIds) {
+        List<Long> sanitizedVariantIds = variantIds == null
+                ? List.of()
+                : variantIds.stream().filter(java.util.Objects::nonNull).toList();
+
+        if (sanitizedVariantIds.size() != 2) {
+            throw new IllegalArgumentException("Vui lòng chọn đúng 2 variant để so sánh");
+        }
+        if (sanitizedVariantIds.get(0).equals(sanitizedVariantIds.get(1))) {
+            throw new IllegalArgumentException("2 variant so sánh phải khác nhau");
+        }
+
+        List<ProductVariant> variants = productVariantRepository.findAllById(sanitizedVariantIds);
+        if (variants.size() != 2) {
+            throw new ResourceNotFoundException("Không tìm thấy đủ 2 variant để so sánh");
+        }
+
+        Map<Long, ProductVariant> variantMap = variants.stream()
+                .collect(Collectors.toMap(ProductVariant::getId, v -> v));
+
+        List<ProductCompareItemResponse> items = new ArrayList<>();
+        for (Long variantId : sanitizedVariantIds) {
+            ProductVariant variant = variantMap.get(variantId);
+            if (variant == null) {
+                throw new ResourceNotFoundException("Không tìm thấy variant với id: " + variantId);
+            }
+
+            Product product = variant.getProduct();
+            if (product == null || !Boolean.TRUE.equals(product.getIsActive())) {
+                throw new IllegalArgumentException("Variant thuộc sản phẩm không khả dụng để so sánh");
+            }
+
+            items.add(ProductCompareItemResponse.builder()
+                    .productId(product.getId())
+                    .productName(product.getName())
+                    .slug(product.getSlug())
+                    .thumbnailUrl(product.getThumbnailUrl())
+                    .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
+                    .variantId(variant.getId())
+                    .sku(variant.getSku())
+                    .price(variant.getPrice())
+                    .weight(variant.getWeight())
+                    .gripSize(variant.getGripSize())
+                    .stiffness(variant.getStiffness())
+                    .balancePoint(variant.getBalancePoint())
+                    .build());
+        }
+
+        return ProductCompareResponse.builder().items(items).build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WishlistItemResponse> getMyWishlist(String principalName) {
+        User user = findUserByPrincipal(principalName);
+        return productWishlistRepository.findAllByUserIdWithProduct(user.getId())
+                .stream()
+                .map(this::mapToWishlistItem)
+                .toList();
+    }
+
+    @Override
+    public WishlistItemResponse addToWishlist(String principalName, Long productId) {
+        User user = findUserByPrincipal(principalName);
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với id: " + productId));
+
+        if (!Boolean.TRUE.equals(product.getIsActive())) {
+            throw new IllegalArgumentException("Chỉ có thể thêm sản phẩm đang hoạt động vào yêu thích");
+        }
+
+        ProductWishlist wishlist = productWishlistRepository.findByUserIdAndProductId(user.getId(), productId)
+                .orElseGet(() -> productWishlistRepository.save(ProductWishlist.builder()
+                        .user(user)
+                        .product(product)
+                        .build()));
+
+        return mapToWishlistItem(wishlist);
+    }
+
+    @Override
+    public void removeFromWishlist(String principalName, Long productId) {
+        User user = findUserByPrincipal(principalName);
+        productWishlistRepository.findByUserIdAndProductId(user.getId(), productId)
+                .ifPresent(productWishlistRepository::delete);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isInWishlist(String principalName, Long productId) {
+        User user = findUserByPrincipal(principalName);
+        return productWishlistRepository.existsByUserIdAndProductId(user.getId(), productId);
     }
 
     // ===== Admin APIs =====
@@ -197,11 +306,19 @@ public class ProductServiceImpl implements ProductService {
         Product product = findProductOrThrow(productId);
         ProductVariant variant = ProductVariant.builder()
                 .sku(request.getSku())
+                .weight(request.getWeight())
+                .gripSize(request.getGripSize())
+                .stiffness(request.getStiffness())
+                .balancePoint(request.getBalancePoint())
                 .size(request.getSize())
                 .color(request.getColor())
                 .price(request.getPrice())
                 .originalPrice(request.getPrice())
                 .stock(request.getStock())
+            .shippingWeightGrams(request.getShippingWeightGrams())
+            .shippingLengthCm(request.getShippingLengthCm())
+            .shippingWidthCm(request.getShippingWidthCm())
+            .shippingHeightCm(request.getShippingHeightCm())
                 .build();
         product.addProductVariant(variant);
         productRepository.save(product);
@@ -217,11 +334,19 @@ public class ProductServiceImpl implements ProductService {
         Product product = findProductOrThrow(productId);
         ProductVariant variant = findProductVariant(product, variantId);
         variant.setSku(request.getSku());
+        variant.setWeight(request.getWeight());
+        variant.setGripSize(request.getGripSize());
+        variant.setStiffness(request.getStiffness());
+        variant.setBalancePoint(request.getBalancePoint());
         variant.setSize(request.getSize());
         variant.setColor(request.getColor());
         variant.setPrice(request.getPrice());
         variant.setOriginalPrice(request.getPrice());
         variant.setStock(request.getStock());
+        variant.setShippingWeightGrams(request.getShippingWeightGrams());
+        variant.setShippingLengthCm(request.getShippingLengthCm());
+        variant.setShippingWidthCm(request.getShippingWidthCm());
+        variant.setShippingHeightCm(request.getShippingHeightCm());
         productRepository.save(product);
         return mapToVariantResponse(variant);
     }
@@ -501,10 +626,18 @@ public class ProductServiceImpl implements ProductService {
         return ProductVariantResponse.builder()
             .id(variant.getId())
             .sku(variant.getSku())
+                .weight(variant.getWeight())
+                .gripSize(variant.getGripSize())
+                .stiffness(variant.getStiffness())
+                .balancePoint(variant.getBalancePoint())
             .size(variant.getSize())
             .color(variant.getColor())
             .price(variant.getPrice())
             .stock(variant.getStock())
+            .shippingWeightGrams(variant.getShippingWeightGrams())
+            .shippingLengthCm(variant.getShippingLengthCm())
+            .shippingWidthCm(variant.getShippingWidthCm())
+            .shippingHeightCm(variant.getShippingHeightCm())
             .build();
         }
 
@@ -528,6 +661,26 @@ public class ProductServiceImpl implements ProductService {
             .findFirst()
             .orElseThrow(() -> new ResourceNotFoundException(
                 "Không tìm thấy variant với id: " + variantId));
+        }
+
+        private WishlistItemResponse mapToWishlistItem(ProductWishlist wishlist) {
+            Product product = wishlist.getProduct();
+            return WishlistItemResponse.builder()
+                    .wishlistId(wishlist.getId())
+                    .productId(product != null ? product.getId() : null)
+                    .productName(product != null ? product.getName() : null)
+                    .slug(product != null ? product.getSlug() : null)
+                    .thumbnailUrl(product != null ? product.getThumbnailUrl() : null)
+                    .basePrice(product != null ? product.getBasePrice() : null)
+                    .brandName(product != null && product.getBrand() != null ? product.getBrand().getName() : null)
+                    .categoryName(product != null && product.getCategory() != null ? product.getCategory().getName() : null)
+                    .addedAt(wishlist.getCreatedAt())
+                    .build();
+        }
+
+        private User findUserByPrincipal(String principalName) {
+            return userRepository.findByEmail(principalName)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + principalName));
         }
 
     private void deleteFileIfExists(String url) {

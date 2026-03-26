@@ -122,4 +122,39 @@ public class EmailServiceImpl implements EmailService {
             throw new RuntimeException("Failed to send order cancellation email", e);
         }
     }
+
+    @Override
+    public void sendOrderConfirmationEmail(String to, String orderCode, String customerName, Double totalAmount, String paymentMethod) {
+        MimeMessage message = mailSender.createMimeMessage();
+        try {
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(to);
+            helper.setSubject("Xác nhận đơn hàng - Badminton Shop");
+
+            java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("vi", "VN"));
+            String formattedAmount = format.format(totalAmount);
+
+            String content = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;\">"
+                    + "<div style=\"background-color: #2c3e50; color: white; padding: 20px; text-align: center;\">"
+                    + "<h2>Cảm ơn bạn đã đặt hàng!</h2>"
+                    + "</div>"
+                    + "<div style=\"padding: 20px;\">"
+                    + "<p>Xin chào <b>" + customerName + "</b>,</p>"
+                    + "<p>Đơn hàng <b>" + orderCode + "</b> của bạn đã được tạo thành công trên hệ thống của Badminton Shop.</p>"
+                    + "<table style=\"width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 20px;\">"
+                    + "<tr><td style=\"padding: 8px; border-bottom: 1px solid #eee;\"><b>Mã đơn hàng:</b></td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">" + orderCode + "</td></tr>"
+                    + "<tr><td style=\"padding: 8px; border-bottom: 1px solid #eee;\"><b>Tổng tiền:</b></td><td style=\"padding: 8px; border-bottom: 1px solid #eee; color: #e74c3c; font-weight: bold;\">" + formattedAmount + "</td></tr>"
+                    + "<tr><td style=\"padding: 8px; border-bottom: 1px solid #eee;\"><b>Phương thức:</b></td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">" + paymentMethod + "</td></tr>"
+                    + "</table>"
+                    + "<p>Chúng tôi sẽ sớm xử lý và giao hàng đến bạn.</p>"
+                    + "<p style=\"color: #7f8c8d; font-size: 0.9em;\">Đây là email tự động, vui lòng không trả lời. Nếu cần hỗ trợ, hãy liên hệ qua kênh CSKH của chúng tôi.</p>"
+                    + "</div>"
+                    + "</div>";
+
+            helper.setText(content, true);
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Failed to send order confirmation email", e);
+        }
+    }
 }

@@ -29,6 +29,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Optional;
@@ -70,6 +71,13 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(authService, "forgotPasswordCooldownSeconds", 60);
+        ReflectionTestUtils.setField(authService, "forgotPasswordMaxRequests", 3);
+        ReflectionTestUtils.setField(authService, "forgotPasswordWindowSeconds", 300);
+        ReflectionTestUtils.setField(authService, "resendVerificationCooldownSeconds", 60);
+        ReflectionTestUtils.setField(authService, "resendVerificationMaxRequests", 3);
+        ReflectionTestUtils.setField(authService, "resendVerificationWindowSeconds", 300);
+
         testUser = User.builder()
                 .id(1L)
                 .email("test@example.com")
@@ -176,10 +184,12 @@ class AuthServiceTest {
     @Test
     void resendVerification_Success() {
         testUser.setIsEmailVerified(false);
+        when(rateLimitService.isInCooldown(anyString(), anyInt())).thenReturn(false);
+        when(rateLimitService.isRateLimited(anyString(), anyInt(), anyInt())).thenReturn(false);
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        authService.resendVerification("test@example.com");
+        authService.resendVerification("test@example.com", "127.0.0.1");
 
         verify(valueOperations).set(startsWith("verify:"), anyString(), anyLong(), any());
         verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(EmailMessage.class));
@@ -187,10 +197,12 @@ class AuthServiceTest {
 
     @Test
     void forgotPassword_Success() {
+        when(rateLimitService.isInCooldown(anyString(), anyInt())).thenReturn(false);
+        when(rateLimitService.isRateLimited(anyString(), anyInt(), anyInt())).thenReturn(false);
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        authService.forgotPassword("test@example.com");
+        authService.forgotPassword("test@example.com", "127.0.0.1");
 
         verify(valueOperations).set(startsWith("reset:"), anyString(), anyLong(), any());
         verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(EmailMessage.class));

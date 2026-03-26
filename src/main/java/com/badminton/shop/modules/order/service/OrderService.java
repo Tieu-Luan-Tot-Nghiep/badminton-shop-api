@@ -27,6 +27,8 @@ public interface OrderService {
 
 	OrderResponse cancelOrderByUser(String principalName, String orderCode, String reason);
 
+	OrderResponse confirmCodOrder(String orderCode, String adminName, String note);
+
 	int autoCancelExpiredPendingVnpayOrders();
 
 	ReturnRequestResponse createReturnRequest(String principalName, String orderCode, CreateReturnRequest request);

@@ -80,6 +80,7 @@
 - URL: /api/orders/preview
 - Method: POST
 - Description: Xem trước đơn hàng trước khi đặt (tính itemsAmount, shippingFee, totalAmount).
+- Shipping Fee: được tính realtime từ GHN (staging) theo địa chỉ nhận và trọng lượng/kích thước package.
 - Authentication: Bắt buộc (Bearer token).
 - Request Body (CreateOrderRequest):
   {
@@ -103,6 +104,16 @@
   }
 - Notes:
   - Ưu tiên dùng addressId để chọn địa chỉ từ sổ địa chỉ.
+  - Dữ liệu địa chỉ cần đầy đủ (specificAddress, ward, district, province) để map sang GHN DistrictID/WardCode.
+  - Hệ thống map địa chỉ theo GHN theo thứ tự ưu tiên:
+    1) Nếu district là số thuần: xem như DistrictID GHN.
+    2) Nếu ward trùng WardCode: dùng trực tiếp WardCode.
+    3) Nếu là tên: map theo tên chuẩn hóa (hỗ trợ viết tắt như Q1, P. Ben Nghe, TP.HCM).
+  - Nếu không map được quận/huyện hoặc phường/xã, API trả về 400 (không gọi GHN) để tránh lỗi 502 từ upstream.
+  - Nên lấy danh mục chuẩn từ các API shipping:
+    - GET /api/shipping/provinces
+    - GET /api/shipping/provinces/{provinceId}/districts
+    - GET /api/shipping/districts/{districtId}/wards
   - Nếu không gửi addressId, hệ thống dùng receiverName/receiverPhone/shippingAddress nếu có.
   - Nếu không gửi cả 2, hệ thống tự động fallback địa chỉ mặc định của user.
   - voucherCode là optional, chuẩn bị sẵn cho module Promotion.
@@ -119,6 +130,8 @@
 - Request Body: giống CreateOrderRequest ở mục 2.1.
 - Notes:
   - voucherCode là optional, chuẩn bị sẵn cho module Promotion.
+  - shippingFee trong đơn được lấy từ GHN, tính theo VNĐ.
+  - Khi đơn chuyển trạng thái CONFIRMED (ví dụ thanh toán VNPAY thành công), hệ thống tự tạo vận đơn GHN và lưu shippingCode.
 - Success Response (200 OK): OrderResponse.
 
 ### 2.3. Get My Orders
@@ -162,6 +175,20 @@
     "orderStatus": "CONFIRMED",
     "responseCode": "00"
   }
+
+### 2.13. OrderResponse shipping fields
+- order response đã bổ sung các trường:
+  - shippingCode: mã vận đơn GHN
+  - shippingProvider: hiện tại là GHN
+  - shippingExpectedDeliveryAt: thời gian dự kiến giao hàng
+
+### 2.14. Admin Confirm COD Order
+- URL: /api/orders/admin/{orderCode}/confirm-cod
+- Method: POST
+- Description: Admin xác nhận đơn COD để chuyển đơn sang CONFIRMED, commit tồn kho và trigger tạo vận đơn GHN.
+- Authentication: ADMIN.
+- Query Params:
+  - note (optional): ghi chú xác nhận.
 
 ### 2.5. VNPAY IPN (Backend-to-backend)
 - URL: /api/orders/vnpay-ipn

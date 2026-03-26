@@ -7,6 +7,8 @@ import com.badminton.shop.modules.product.dto.ProductRequest;
 import com.badminton.shop.modules.product.dto.ProductResponse;
 import com.badminton.shop.modules.product.dto.ProductVariantRequest;
 import com.badminton.shop.modules.product.dto.ProductVariantResponse;
+import com.badminton.shop.modules.product.dto.ProductCompareResponse;
+import com.badminton.shop.modules.product.dto.WishlistItemResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,6 +31,16 @@ public interface ProductService {
     List<ProductListResponse> getFeaturedProducts(int limit);
 
     List<ProductListResponse> getNewestProducts(int limit);
+
+    ProductCompareResponse compareVariants(List<Long> variantIds);
+
+    List<WishlistItemResponse> getMyWishlist(String principalName);
+
+    WishlistItemResponse addToWishlist(String principalName, Long productId);
+
+    void removeFromWishlist(String principalName, Long productId);
+
+    boolean isInWishlist(String principalName, Long productId);
 
     // Admin APIs
     ProductResponse createProduct(ProductRequest request);

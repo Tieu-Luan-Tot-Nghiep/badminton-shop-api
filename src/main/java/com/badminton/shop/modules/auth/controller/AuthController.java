@@ -56,8 +56,11 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<Object>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        authService.forgotPassword(request.getEmail());
+    public ResponseEntity<ApiResponse<Object>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest servletRequest) {
+        String ipAddress = servletRequest.getRemoteAddr();
+        authService.forgotPassword(request.getEmail(), ipAddress);
         return ResponseEntity.ok(ApiResponse.success("Da gui link dat lai mat khau vao email cua ban. Vui long kiem tra hop thu.", null));
     }
 
@@ -96,9 +99,12 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
-    public ResponseEntity<ApiResponse<Object>> resendVerification(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ApiResponse<Object>> resendVerification(
+            @RequestBody Map<String, String> request,
+            HttpServletRequest servletRequest) {
+        String ipAddress = servletRequest.getRemoteAddr();
         String email = request.get("email");
-        authService.resendVerification(email);
+        authService.resendVerification(email, ipAddress);
         return ResponseEntity.ok(ApiResponse.success("Da gui ma xac thuc moi. Vui long kiem tra email cua ban.", null));
     }
 

@@ -32,6 +32,9 @@ public class OrderResponse {
 	private BigDecimal itemsAmount;
 	private BigDecimal shippingFee;
 	private BigDecimal totalAmount;
+	private String shippingCode;
+	private String shippingProvider;
+	private LocalDateTime shippingExpectedDeliveryAt;
 	private String paymentUrl;
 	private LocalDateTime createdAt;
 

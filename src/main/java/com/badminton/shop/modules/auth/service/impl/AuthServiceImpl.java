@@ -51,6 +51,24 @@ public class AuthServiceImpl implements AuthService {
     private static final String REDIS_REFRESH_TOKEN_PREFIX = "refresh:";
     private static final String REDIS_RESET_PASSWORD_PREFIX = "reset:";
 
+    @Value("${app.auth.rate-limit.forgot-password.cooldown-seconds:60}")
+    private int forgotPasswordCooldownSeconds;
+
+    @Value("${app.auth.rate-limit.forgot-password.max-requests:3}")
+    private int forgotPasswordMaxRequests;
+
+    @Value("${app.auth.rate-limit.forgot-password.window-seconds:300}")
+    private int forgotPasswordWindowSeconds;
+
+    @Value("${app.auth.rate-limit.resend-verification.cooldown-seconds:60}")
+    private int resendVerificationCooldownSeconds;
+
+    @Value("${app.auth.rate-limit.resend-verification.max-requests:3}")
+    private int resendVerificationMaxRequests;
+
+    @Value("${app.auth.rate-limit.resend-verification.window-seconds:300}")
+    private int resendVerificationWindowSeconds;
+
     @Override
     public AuthResponse register(RegisterRequest request, String ipAddress) {
         // 1. Kiểm tra Cooldown 30s giữa các request từ cùng IP/Email
@@ -238,18 +256,30 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email)
+    public void forgotPassword(String email, String ipAddress) {
+        String normalizedEmail = normalizeEmail(email);
+        String normalizedIpAddress = normalizeIpAddress(ipAddress);
+
+        checkSensitiveActionRateLimit(
+                "forgot-password",
+                normalizedEmail,
+                normalizedIpAddress,
+                forgotPasswordCooldownSeconds,
+                forgotPasswordMaxRequests,
+                forgotPasswordWindowSeconds,
+                "Bạn đã gửi quá nhiều yêu cầu quên mật khẩu. Vui lòng thử lại sau vài phút.");
+
+        User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email này"));
 
         String resetToken = UUID.randomUUID().toString();
 
         // Lưu token vào Redis với TTL là 15 phút
-        redisTemplate.opsForValue().set(REDIS_RESET_PASSWORD_PREFIX + resetToken, email, 15, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(REDIS_RESET_PASSWORD_PREFIX + resetToken, normalizedEmail, 15, TimeUnit.MINUTES);
 
         // Gửi message vào RabbitMQ
         EmailMessage message = EmailMessage.builder()
-                .email(email)
+                .email(normalizedEmail)
                 .token(resetToken)
                 .type(EmailMessage.EmailType.FORGOT_PASSWORD)
                 .build();
@@ -352,8 +382,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void resendVerification(String email) {
-        User user = userRepository.findByEmail(email)
+    public void resendVerification(String email, String ipAddress) {
+        String normalizedEmail = normalizeEmail(email);
+        String normalizedIpAddress = normalizeIpAddress(ipAddress);
+
+        checkSensitiveActionRateLimit(
+                "resend-verification",
+                normalizedEmail,
+                normalizedIpAddress,
+                resendVerificationCooldownSeconds,
+                resendVerificationMaxRequests,
+                resendVerificationWindowSeconds,
+                "Bạn đã gửi quá nhiều yêu cầu gửi lại mã xác thực. Vui lòng thử lại sau vài phút.");
+
+        User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         if (user.getIsEmailVerified()) {
@@ -363,12 +405,12 @@ public class AuthServiceImpl implements AuthService {
         String verificationToken = UUID.randomUUID().toString();
 
         // Lưu token vào Redis với TTL là 10 phút
-        redisTemplate.opsForValue().set(REDIS_VERIFY_PREFIX + email, verificationToken, 10,
+        redisTemplate.opsForValue().set(REDIS_VERIFY_PREFIX + normalizedEmail, verificationToken, 10,
                 TimeUnit.MINUTES);
 
         // Gửi message vào RabbitMQ
         EmailMessage message = EmailMessage.builder()
-                .email(email)
+                .email(normalizedEmail)
                 .token(verificationToken)
                 .type(EmailMessage.EmailType.VERIFICATION)
                 .build();
@@ -383,5 +425,41 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         userRepository.delete(user);
+    }
+
+    private void checkSensitiveActionRateLimit(
+            String action,
+            String email,
+            String ipAddress,
+            int cooldownSeconds,
+            int maxRequests,
+            int windowSeconds,
+            String exceedLimitMessage) {
+        String ipIdentifier = action + ":ip:" + ipAddress;
+        String emailIdentifier = action + ":email:" + email;
+
+        if (rateLimitService.isInCooldown(ipIdentifier, cooldownSeconds)
+                || rateLimitService.isInCooldown(emailIdentifier, cooldownSeconds)) {
+            throw new TooManyRequestsException("Vui lòng đợi " + cooldownSeconds + " giây trước khi thử lại.");
+        }
+
+        if (rateLimitService.isRateLimited(ipIdentifier, maxRequests, windowSeconds)
+                || rateLimitService.isRateLimited(emailIdentifier, maxRequests, windowSeconds)) {
+            throw new TooManyRequestsException(exceedLimitMessage);
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email không được để trống.");
+        }
+        return email.trim().toLowerCase();
+    }
+
+    private String normalizeIpAddress(String ipAddress) {
+        if (ipAddress == null || ipAddress.trim().isEmpty()) {
+            return "unknown";
+        }
+        return ipAddress.trim();
     }
 }

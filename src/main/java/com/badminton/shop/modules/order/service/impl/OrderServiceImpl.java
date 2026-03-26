@@ -18,6 +18,8 @@ import com.badminton.shop.modules.inventory.dto.InventoryLineRequest;
 import com.badminton.shop.modules.inventory.dto.SystemInventoryRequest;
 import com.badminton.shop.modules.inventory.service.InventoryService;
 import com.badminton.shop.modules.messaging.dto.OrderCancelledEvent;
+import com.badminton.shop.modules.messaging.dto.OrderCancellationEmailMessage;
+import com.badminton.shop.modules.messaging.dto.OrderConfirmationEmailMessage;
 import com.badminton.shop.modules.messaging.dto.RefundRequiredMessage;
 import com.badminton.shop.modules.order.entity.Order;
 import com.badminton.shop.modules.order.entity.OrderHistory;
@@ -35,9 +37,14 @@ import com.badminton.shop.modules.order.repository.OrderRepository;
 import com.badminton.shop.modules.order.service.OrderService;
 import com.badminton.shop.modules.promotion.dto.response.PromotionApplyResult;
 import com.badminton.shop.modules.promotion.service.PromotionService;
+import com.badminton.shop.modules.membership.service.MembershipService;
 import com.badminton.shop.modules.product.entity.Product;
 import com.badminton.shop.modules.product.entity.ProductVariant;
 import com.badminton.shop.modules.product.repository.ProductVariantRepository;
+import com.badminton.shop.modules.shipping.dto.request.ShippingFeeCalculationRequest;
+import com.badminton.shop.modules.shipping.dto.request.ShippingOrderCreationRequest;
+import com.badminton.shop.modules.shipping.dto.response.ShippingOrderResponse;
+import com.badminton.shop.modules.shipping.service.ShippingService;
 import com.badminton.shop.config.RabbitMQConfig;
 import com.badminton.shop.utils.email.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -53,11 +60,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -71,8 +80,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class OrderServiceImpl implements OrderService {
 
-    private static final BigDecimal DEFAULT_SHIPPING_FEE = BigDecimal.valueOf(30000);
-
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final UserAddressRepository userAddressRepository;
@@ -80,7 +87,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderReturnRequestRepository orderReturnRequestRepository;
     private final PromotionService promotionService;
+    private final MembershipService membershipService;
     private final InventoryService inventoryService;
+    private final ShippingService shippingService;
     private final RabbitTemplate rabbitTemplate;
     private final EmailService emailService;
 
@@ -125,7 +134,8 @@ public class OrderServiceImpl implements OrderService {
     public OrderPreviewResponse previewOrder(String principalName, CreateOrderRequest request) {
         User user = getUserByPrincipal(principalName);
         ShippingSnapshot shipping = resolveShippingSnapshot(user, request);
-        PricingResult pricing = calculatePricing(request.getItems(), request.getVoucherCode());
+        BigDecimal shippingFee = calculateActualShippingFee(shipping.address(), request.getItems());
+        PricingResult pricing = calculatePricing(request.getItems(), request.getVoucherCode(), shippingFee, user.getId());
 
         return OrderPreviewResponse.builder()
                 .items(pricing.items())
@@ -141,7 +151,8 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse purchase(String principalName, CreateOrderRequest request) {
         User user = getUserByPrincipal(principalName);
         ShippingSnapshot shipping = resolveShippingSnapshot(user, request);
-        PricingResult pricing = calculatePricing(request.getItems(), request.getVoucherCode());
+        BigDecimal shippingFee = calculateActualShippingFee(shipping.address(), request.getItems());
+        PricingResult pricing = calculatePricing(request.getItems(), request.getVoucherCode(), shippingFee, user.getId());
 
         String orderCode = generateOrderCode();
         PaymentMethod paymentMethod = request.getPaymentMethod();
@@ -161,6 +172,7 @@ public class OrderServiceImpl implements OrderService {
                 .status(initialStatus)
                 .paymentMethod(paymentMethod)
                 .paymentStatus(paymentStatus)
+                .shippingProvider("GHN")
                 .user(user)
                 .promotion(pricing.promotion())
                 .build();
@@ -207,6 +219,27 @@ public class OrderServiceImpl implements OrderService {
             paymentUrl = buildVnpayPaymentUrl(saved);
         }
 
+        if (saved.getStatus() == OrderStatus.CONFIRMED) {
+            createShippingOrderIfApplicable(saved);
+            saved = orderRepository.save(saved);
+        }
+
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EMAIL_EXCHANGE,
+                    RabbitMQConfig.ORDER_CONFIRMATION_EMAIL_ROUTING_KEY,
+                    OrderConfirmationEmailMessage.builder()
+                            .email(user.getEmail())
+                            .orderCode(saved.getOrderCode())
+                            .customerName(saved.getReceiverName())
+                            .totalAmount(saved.getTotalAmount())
+                            .paymentMethod(saved.getPaymentMethod().name())
+                            .build()
+            );
+        } catch (Exception e) {
+            // Ignore email failure
+        }
+        
         return toOrderResponse(saved, paymentUrl);
     }
 
@@ -276,6 +309,18 @@ public class OrderServiceImpl implements OrderService {
                         .status(OrderStatus.CONFIRMED)
                         .note("Thanh toán VNPAY thành công")
                         .build());
+
+                try {
+                    membershipService.addPointsFromOrder(
+                            order.getUser().getId(),
+                            BigDecimal.valueOf(order.getTotalAmount()),
+                            order.getId()
+                    );
+                } catch (RuntimeException ignored) {
+                    // Loyalty failure should not block payment success flow.
+                }
+
+                createShippingOrderIfApplicable(order);
             }
         } else {
             if (order.getPaymentStatus() == PaymentStatus.PENDING && order.getStatus() != OrderStatus.CANCELLED) {
@@ -319,6 +364,33 @@ public class OrderServiceImpl implements OrderService {
         }
 
         cancelOrderInternal(order, reason, user.getEmail());
+        Order saved = orderRepository.save(order);
+        return toOrderResponse(saved, null);
+    }
+
+    @Override
+    public OrderResponse confirmCodOrder(String orderCode, String adminName, String note) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+
+        if (order.getPaymentMethod() != PaymentMethod.COD) {
+            throw new IllegalArgumentException("Chỉ hỗ trợ xác nhận cho đơn COD.");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new IllegalArgumentException("Chỉ xác nhận được đơn COD ở trạng thái PENDING.");
+        }
+
+        inventoryService.commitInventory(buildSystemInventoryRequest(order, "Commit inventory after COD confirmation"));
+
+        order.setStatus(OrderStatus.CONFIRMED);
+        order.getHistories().add(OrderHistory.builder()
+                .order(order)
+                .status(OrderStatus.CONFIRMED)
+                .note("Admin xác nhận đơn COD: " + safe(note) + " (" + adminName + ")")
+                .build());
+
+        createShippingOrderIfApplicable(order);
         Order saved = orderRepository.save(order);
         return toOrderResponse(saved, null);
     }
@@ -526,10 +598,21 @@ public class OrderServiceImpl implements OrderService {
 
         OrderReturnRequest saved = orderReturnRequestRepository.save(returnRequest);
         orderRepository.save(order);
+
+        try {
+            membershipService.rollbackPointsFromOrder(order.getUser().getId(), order.getId(), "refund");
+        } catch (RuntimeException ignored) {
+            // Refund flow should not fail due to loyalty rollback issue.
+        }
+
         return toReturnRequestResponse(saved);
     }
 
-    private PricingResult calculatePricing(List<CreateOrderRequest.OrderLineRequest> lines, String voucherCode) {
+        private PricingResult calculatePricing(
+            List<CreateOrderRequest.OrderLineRequest> lines,
+            String voucherCode,
+            BigDecimal baseShippingFee,
+            Long userId) {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("Danh sách sản phẩm không được để trống");
         }
@@ -559,17 +642,27 @@ public class OrderServiceImpl implements OrderService {
                     .build());
         }
 
-        BigDecimal baseShippingFee = DEFAULT_SHIPPING_FEE;
         PromotionApplyResult promotionResult = promotionService.applyPromotionForOrder(voucherCode, itemsAmount, baseShippingFee);
+
+        // Membership discount
+        BigDecimal membershipDiscountPercent = membershipService.getDiscountPercentage(userId);
+        BigDecimal tierDiscount = itemsAmount.multiply(membershipDiscountPercent).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+
+        BigDecimal finalDiscount = promotionResult.getDiscountAmount().add(tierDiscount);
+        BigDecimal newFinalTotal = promotionResult.getFinalTotalAmount().subtract(tierDiscount);
+        if (newFinalTotal.compareTo(BigDecimal.ZERO) < 0) {
+            finalDiscount = finalDiscount.add(newFinalTotal); // adjust finalDiscount
+            newFinalTotal = BigDecimal.ZERO;
+        }
 
         return new PricingResult(
             previewItems,
             promotionResult.getPromotion(),
             promotionResult.getVoucherCode(),
             itemsAmount,
-            promotionResult.getDiscountAmount(),
+            finalDiscount,
             promotionResult.getFinalShippingFee(),
-            promotionResult.getFinalTotalAmount()
+            newFinalTotal
         );
     }
 
@@ -606,11 +699,52 @@ public class OrderServiceImpl implements OrderService {
                 .itemsAmount(BigDecimal.valueOf(order.getItemsAmount()))
                 .shippingFee(BigDecimal.valueOf(order.getShippingFee()))
                 .totalAmount(BigDecimal.valueOf(order.getTotalAmount()))
+                .shippingCode(order.getShippingCode())
+                .shippingProvider(order.getShippingProvider())
+                .shippingExpectedDeliveryAt(order.getShippingExpectedDeliveryAt())
                 .paymentUrl(paymentUrl)
                 .createdAt(order.getCreatedAt())
                 .items(lines)
                 .build();
     }
+
+            private BigDecimal calculateActualShippingFee(UserAddress shippingAddress, List<CreateOrderRequest.OrderLineRequest> lines) {
+            List<ShippingFeeCalculationRequest.ShippingItemRequest> shippingItems = buildShippingItems(lines);
+            BigDecimal insuranceValue = shippingItems.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            return shippingService.calculateShippingFee(ShippingFeeCalculationRequest.builder()
+                .address(shippingAddress)
+                .insuranceValue(insuranceValue)
+                .items(shippingItems)
+                .build()).setScale(0, RoundingMode.HALF_UP);
+            }
+
+            private List<ShippingFeeCalculationRequest.ShippingItemRequest> buildShippingItems(
+                List<CreateOrderRequest.OrderLineRequest> lines) {
+            List<ShippingFeeCalculationRequest.ShippingItemRequest> shippingItems = new ArrayList<>();
+
+            for (CreateOrderRequest.OrderLineRequest line : lines) {
+                ProductVariant variant = productVariantRepository.findById(line.getVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy biến thể sản phẩm với id: " + line.getVariantId()));
+
+                Product product = variant.getProduct();
+                shippingItems.add(ShippingFeeCalculationRequest.ShippingItemRequest.builder()
+                    .name(product != null ? product.getName() : variant.getSku())
+                    .sku(variant.getSku())
+                    .quantity(line.getQuantity())
+                    .unitPrice(BigDecimal.valueOf(variant.getPrice()))
+                    .weightGrams(variant.getShippingWeightGrams())
+                    .lengthCm(variant.getShippingLengthCm())
+                    .widthCm(variant.getShippingWidthCm())
+                    .heightCm(variant.getShippingHeightCm())
+                    .build());
+            }
+
+            return shippingItems;
+            }
 
     private String buildVnpayPaymentUrl(Order order) {
         String createDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
@@ -726,15 +860,22 @@ public class OrderServiceImpl implements OrderService {
             return new ShippingSnapshot(
                     selected.getReceiverName(),
                     selected.getPhoneNumber(),
-                    fullAddress(selected)
+                    fullAddress(selected),
+                    selected
             );
         }
 
         if (hasText(request.getReceiverName()) && hasText(request.getReceiverPhone()) && hasText(request.getShippingAddress())) {
+                UserAddress manualAddress = parseManualAddress(
+                    request.getReceiverName(),
+                    request.getReceiverPhone(),
+                    request.getShippingAddress());
+
             return new ShippingSnapshot(
                     request.getReceiverName().trim(),
                     request.getReceiverPhone().trim(),
-                    request.getShippingAddress().trim()
+                    request.getShippingAddress().trim(),
+                    manualAddress
             );
         }
 
@@ -747,9 +888,33 @@ public class OrderServiceImpl implements OrderService {
         return new ShippingSnapshot(
                 defaultAddress.getReceiverName(),
                 defaultAddress.getPhoneNumber(),
-                fullAddress(defaultAddress)
+            fullAddress(defaultAddress),
+            defaultAddress
         );
     }
+
+        private UserAddress parseManualAddress(String receiverName, String receiverPhone, String shippingAddress) {
+        String[] parts = Arrays.stream(shippingAddress.split(","))
+            .map(String::trim)
+            .filter(this::hasText)
+            .toArray(String[]::new);
+
+        if (parts.length < 4) {
+            throw new IllegalArgumentException(
+                "Địa chỉ giao hàng phải có đủ dạng: so nha, phuong/xa, quan/huyen, tinh/thanh pho.");
+        }
+
+        int n = parts.length;
+        return UserAddress.builder()
+            .receiverName(receiverName.trim())
+            .phoneNumber(receiverPhone.trim())
+            .specificAddress(String.join(", ", Arrays.copyOfRange(parts, 0, n - 3)))
+            .ward(parts[n - 3])
+            .district(parts[n - 2])
+            .province(parts[n - 1])
+            .isDefault(false)
+            .build();
+        }
 
     private CheckoutAddressResponse toCheckoutAddress(UserAddress address) {
         return CheckoutAddressResponse.builder()
@@ -781,6 +946,66 @@ public class OrderServiceImpl implements OrderService {
         return "ORD-" + DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()) +
                 "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
+
+        private void createShippingOrderIfApplicable(Order order) {
+        if (order.getStatus() != OrderStatus.CONFIRMED || hasText(order.getShippingCode())) {
+            return;
+        }
+
+        UserAddress shipmentAddress = parseManualAddress(
+            order.getReceiverName(),
+            order.getReceiverPhone(),
+            order.getShippingAddress());
+
+        List<ShippingFeeCalculationRequest.ShippingItemRequest> shippingItems = order.getItems().stream()
+            .map(item -> {
+                ProductVariant variant = item.getVariant();
+                Product product = variant != null ? variant.getProduct() : null;
+                return ShippingFeeCalculationRequest.ShippingItemRequest.builder()
+                    .name(product != null ? product.getName() : (variant != null ? variant.getSku() : "item"))
+                    .sku(variant != null ? variant.getSku() : null)
+                    .quantity(item.getQuantity())
+                    .unitPrice(BigDecimal.valueOf(item.getPriceAtPurchase()))
+                    .weightGrams(variant != null ? variant.getShippingWeightGrams() : null)
+                    .lengthCm(variant != null ? variant.getShippingLengthCm() : null)
+                    .widthCm(variant != null ? variant.getShippingWidthCm() : null)
+                    .heightCm(variant != null ? variant.getShippingHeightCm() : null)
+                    .build();
+            })
+            .toList();
+
+        BigDecimal orderTotal = BigDecimal.valueOf(order.getTotalAmount() == null ? 0d : order.getTotalAmount());
+        BigDecimal codAmount = order.getPaymentMethod() == PaymentMethod.COD
+            ? orderTotal.setScale(0, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
+        ShippingFeeCalculationRequest feeRequest = ShippingFeeCalculationRequest.builder()
+            .address(shipmentAddress)
+            .insuranceValue(orderTotal)
+            .items(shippingItems)
+            .build();
+
+        ShippingOrderResponse shippingOrder = shippingService.createShippingOrder(
+            ShippingOrderCreationRequest.builder()
+                .clientOrderCode(order.getOrderCode())
+                .receiverName(order.getReceiverName())
+                .receiverPhone(order.getReceiverPhone())
+                .address(shipmentAddress)
+                .note(order.getOrderNote())
+                .codAmount(codAmount)
+                .insuranceValue(orderTotal)
+                .feeCalculationRequest(feeRequest)
+                .build());
+
+        order.setShippingCode(shippingOrder.getShippingCode());
+        order.setShippingProvider("GHN");
+        order.setShippingExpectedDeliveryAt(shippingOrder.getExpectedDeliveryTime());
+        order.getHistories().add(OrderHistory.builder()
+            .order(order)
+            .status(order.getStatus())
+            .note("Tạo vận đơn GHN thành công: " + safe(shippingOrder.getShippingCode()))
+            .build());
+        }
 
         private SystemInventoryRequest buildSystemInventoryRequest(Order order, String note) {
         return SystemInventoryRequest.builder()
@@ -830,7 +1055,21 @@ public class OrderServiceImpl implements OrderService {
         }
 
         try {
-            emailService.sendOrderCancellationEmail(order.getUser().getEmail(), order.getOrderCode(), reason);
+            membershipService.rollbackPointsFromOrder(order.getUser().getId(), order.getId(), "cancel");
+        } catch (RuntimeException ignored) {
+            // Cancellation flow should not fail due to loyalty rollback issue.
+        }
+
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EMAIL_EXCHANGE,
+                    RabbitMQConfig.ORDER_CANCELLATION_EMAIL_ROUTING_KEY,
+                    OrderCancellationEmailMessage.builder()
+                            .email(order.getUser().getEmail())
+                            .orderCode(order.getOrderCode())
+                            .reason(reason)
+                            .build()
+            );
         } catch (RuntimeException ignored) {
             // Cancellation should not fail because of a notification issue.
         }
@@ -930,7 +1169,8 @@ public class OrderServiceImpl implements OrderService {
         private record ShippingSnapshot(
             String receiverName,
             String receiverPhone,
-            String shippingAddress
+            String shippingAddress,
+            UserAddress address
         ) {
         }
 

@@ -1,0 +1,45 @@
+### MODULE SHIPPING (GHN)
+
+### 1. Get Provinces
+- URL: /api/shipping/provinces
+- Method: GET
+- Description: Lấy danh mục tỉnh/thành từ GHN.
+- Authentication: Bắt buộc (Bearer token).
+
+### 2. Get Districts By Province
+- URL: /api/shipping/provinces/{provinceId}/districts
+- Method: GET
+- Description: Lấy danh mục quận/huyện theo tỉnh từ GHN.
+- Authentication: Bắt buộc (Bearer token).
+
+### 3. Get Wards By District
+- URL: /api/shipping/districts/{districtId}/wards
+- Method: GET
+- Description: Lấy danh mục phường/xã theo quận/huyện từ GHN.
+- Authentication: Bắt buộc (Bearer token).
+
+### 3.1 Address Mapping Notes (for Order Preview/Purchase)
+- Để tính phí ship GHN chính xác, nên lấy dữ liệu từ 3 API danh mục phía trên.
+- Có thể lưu vào địa chỉ user theo 2 cách:
+  - `district`: lưu DistrictID (dạng số) hoặc tên quận/huyện đúng theo GHN.
+  - `ward`: lưu WardCode hoặc tên phường/xã đúng theo GHN.
+- Hệ thống có hỗ trợ viết tắt phổ biến (`Q1`, `P. Ben Nghe`, `TP.HCM`) nhưng khuyến nghị dùng ID/Code để tránh mismatch.
+
+### 4. Get Shipping Detail
+- URL: /api/shipping/orders/{shippingCode}
+- Method: GET
+- Description: Lấy thông tin vận đơn GHN theo mã vận đơn.
+- Authentication: Bắt buộc (Bearer token).
+
+### 5. GHN Webhook Callback
+- URL: /api/shipping/webhook/ghn
+- Method: POST
+- Description: GHN callback trạng thái vận đơn. Backend publish event vào RabbitMQ để Order consumer cập nhật trạng thái đơn.
+- Authentication: Không yêu cầu JWT. Có thể bảo vệ bằng header X-Webhook-Token nếu cấu hình app.shipping.ghn.callback-auth-token.
+- Request Body (ví dụ):
+  {
+    "OrderCode": "LK123456789VN",
+    "ClientOrderCode": "ORD-20260322130000-AB12CD34",
+    "Status": "delivering",
+    "ShopID": 123456
+  }

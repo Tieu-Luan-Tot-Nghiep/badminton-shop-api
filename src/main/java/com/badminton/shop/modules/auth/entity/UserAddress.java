@@ -37,6 +37,13 @@ public class UserAddress {
     @Column(nullable = false)
     private String specificAddress;
 
+    // Cached GHN master-data IDs/codes for stable shipping fee/order creation.
+    private Integer ghnProvinceId;
+
+    private Integer ghnDistrictId;
+
+    private String ghnWardCode;
+
     private Boolean isDefault;
 
     @Column(nullable = false, columnDefinition = "boolean default false")

@@ -59,6 +59,12 @@ public class Order {
     @Column(nullable = false)
     private PaymentStatus paymentStatus;
 
+    private String shippingCode;
+
+    private String shippingProvider;
+
+    private LocalDateTime shippingExpectedDeliveryAt;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

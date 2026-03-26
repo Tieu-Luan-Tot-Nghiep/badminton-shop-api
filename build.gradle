@@ -41,6 +41,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-hateoas'
     // Starter cho RestClient (thay thế RestTemplate cũ)
     implementation 'org.springframework.boot:spring-boot-starter-web-services'
+    // WebClient for external shipping integrations (GHN)
+    implementation 'org.springframework:spring-webflux'
 
     // --- SWAGGER / OPENAPI (Dành cho Spring Boot 3) ---
     // Phiên bản 2.8.5 giúp fix lỗi "argument t is null" khi dùng Sort/Pageable

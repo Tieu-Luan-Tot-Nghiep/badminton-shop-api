@@ -12,6 +12,14 @@ public class ProductVariantRequest {
     @NotBlank(message = "SKU không được để trống")
     private String sku;
 
+    private String weight;
+
+    private String gripSize;
+
+    private String stiffness;
+
+    private String balancePoint;
+
     @NotBlank(message = "Size không được để trống")
     private String size;
 
@@ -25,4 +33,16 @@ public class ProductVariantRequest {
     @NotNull(message = "Số lượng tồn không được để trống")
     @Min(value = 0, message = "Số lượng tồn phải lớn hơn hoặc bằng 0")
     private Integer stock;
+
+    @Min(value = 1, message = "shippingWeightGrams phải lớn hơn 0")
+    private Integer shippingWeightGrams;
+
+    @Min(value = 1, message = "shippingLengthCm phải lớn hơn 0")
+    private Integer shippingLengthCm;
+
+    @Min(value = 1, message = "shippingWidthCm phải lớn hơn 0")
+    private Integer shippingWidthCm;
+
+    @Min(value = 1, message = "shippingHeightCm phải lớn hơn 0")
+    private Integer shippingHeightCm;
 }

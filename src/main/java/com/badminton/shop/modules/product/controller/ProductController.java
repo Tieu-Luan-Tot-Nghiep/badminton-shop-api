@@ -7,8 +7,10 @@ import com.badminton.shop.modules.product.dto.ProductImageResponse;
 import com.badminton.shop.modules.product.dto.ProductListResponse;
 import com.badminton.shop.modules.product.dto.ProductRequest;
 import com.badminton.shop.modules.product.dto.ProductResponse;
+import com.badminton.shop.modules.product.dto.ProductCompareResponse;
 import com.badminton.shop.modules.product.dto.ProductVariantRequest;
 import com.badminton.shop.modules.product.dto.ProductVariantResponse;
+import com.badminton.shop.modules.product.dto.WishlistItemResponse;
 import com.badminton.shop.modules.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Collections;
@@ -81,6 +84,54 @@ public class ProductController {
     public ResponseEntity<ApiResponse<List<ProductListResponse>>> getNewestProducts(
             @RequestParam(defaultValue = "8") int limit) {
         return ResponseEntity.ok(ApiResponse.success("Newest products fetched successfully.", productService.getNewestProducts(limit)));
+    }
+
+    @GetMapping("/compare")
+    public ResponseEntity<ApiResponse<ProductCompareResponse>> compareProducts(
+            @RequestParam List<Long> variantIds) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Product compare data fetched successfully.",
+                productService.compareVariants(variantIds)
+        ));
+    }
+
+    @GetMapping("/wishlist")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<WishlistItemResponse>>> getMyWishlist(Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Wishlist fetched successfully.",
+                productService.getMyWishlist(principal.getName())
+        ));
+    }
+
+    @PostMapping("/wishlist/{productId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<WishlistItemResponse>> addToWishlist(
+            Principal principal,
+            @PathVariable Long productId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                HttpStatus.CREATED,
+                "Added to wishlist successfully.",
+                productService.addToWishlist(principal.getName(), productId)
+        ));
+    }
+
+    @DeleteMapping("/wishlist/{productId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Object>> removeFromWishlist(
+            Principal principal,
+            @PathVariable Long productId) {
+        productService.removeFromWishlist(principal.getName(), productId);
+        return ResponseEntity.ok(ApiResponse.success("Removed from wishlist successfully.", null));
+    }
+
+    @GetMapping("/wishlist/{productId}/exists")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> isInWishlist(
+            Principal principal,
+            @PathVariable Long productId) {
+        boolean exists = productService.isInWishlist(principal.getName(), productId);
+        return ResponseEntity.ok(ApiResponse.success("Wishlist status fetched successfully.", Map.of("exists", exists)));
     }
 
     // ===== Admin APIs =====

@@ -107,9 +107,11 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 
 ### 8.1 Checkout + Dat hang
 - Lay checkout context (dia chi + dia chi mac dinh) (`GET /api/orders/checkout-context`)
-- Preview don hang (`POST /api/orders/preview`)
+- Preview don hang (`POST /api/orders/preview`) voi phi ship realtime tu GHN
 - Dat hang (`POST /api/orders`)
 - Lay lich su don cua user (`GET /api/orders/my`)
+- Khi don chuyen CONFIRMED (thanh toan thanh cong), tu dong tao van don GHN va luu `shippingCode`
+- Admin co endpoint xac nhan don COD (`POST /api/orders/admin/{orderCode}/confirm-cod`) de trigger tao van don GHN
 
 ### 8.2 Thanh toan VNPAY
 - Return endpoint cho frontend (`GET /api/orders/vnpay-return`)
@@ -210,6 +212,7 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 - InventoryCommandMessage
 - OrderCancelledEvent
 - RefundRequiredMessage
+- ShippingStatusChangedMessage
 - ChatMessagePersistEvent
 
 ### 12.2 Consumers
@@ -220,7 +223,20 @@ Tai lieu nay liet ke tat ca chuc nang da duoc xay dung trong project theo tung m
 - Inventory command consumer
 - Order cancelled consumer (rollback inventory)
 - Refund required consumer (ghi nhan luong hoan tien)
+- Shipping status consumer (cap nhat trang thai order theo webhook GHN)
 - Chat message persist consumer (luu MongoDB + broadcast realtime)
+
+## 15) MODULE SHIPPING (GHN)
+
+- Tich hop GHN staging API qua WebClient
+- ShippingProvider + GHNShippingService cho cac ham:
+	- calculateShippingFee
+	- createShippingOrder
+	- getShippingDetail
+	- getProvinces / getDistricts / getWards
+- Mapping dia chi user (province/district/ward theo ten) sang GHN ID/Code
+- Co webhook endpoint (`POST /api/shipping/webhook/ghn`) va publish event RabbitMQ de Order consumer cap nhat trang thai don
+- Co API danh muc dia chi GHN va tra cuu chi tiet van don
 
 ## 13) MODULE PAYMENT
 

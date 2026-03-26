@@ -47,6 +47,7 @@ public class SecurityConfig {
                             "/api/auth/verify-email",
                             "/api/auth/forgot-password",
                             "/api/auth/reset-password",
+                            "/api/shipping/webhook/ghn",
                                 "/oauth2/**",
                                 "/auth/**",
                                 "/reset-password.html",

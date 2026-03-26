@@ -30,9 +30,15 @@ public class RabbitMQConfig {
     public static final String ORDER_CANCELLED_ROUTING_KEY = "order.cancelled.routingKey";
     public static final String REFUND_REQUIRED_QUEUE = "order.refund-required.queue";
     public static final String REFUND_REQUIRED_ROUTING_KEY = "order.refund-required.routingKey";
+    public static final String ORDER_SHIPPING_STATUS_QUEUE = "order.shipping-status.queue";
+    public static final String ORDER_SHIPPING_STATUS_ROUTING_KEY = "order.shipping-status.routingKey";
     public static final String CHAT_EXCHANGE = "chat.exchange";
     public static final String CHAT_MESSAGE_PERSIST_QUEUE = "chat.message.persist.queue";
     public static final String CHAT_MESSAGE_PERSIST_ROUTING_KEY = "chat.message.persist.routingKey";
+    public static final String ORDER_CANCELLATION_EMAIL_QUEUE = "email.order-cancellation.queue";
+    public static final String ORDER_CANCELLATION_EMAIL_ROUTING_KEY = "email.order-cancellation.routingKey";
+    public static final String ORDER_CONFIRMATION_EMAIL_QUEUE = "email.order-confirmation.queue";
+    public static final String ORDER_CONFIRMATION_EMAIL_ROUTING_KEY = "email.order-confirmation.routingKey";
 
     @Bean
     public Queue emailVerificationQueue() {
@@ -70,8 +76,23 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue orderShippingStatusQueue() {
+        return new Queue(ORDER_SHIPPING_STATUS_QUEUE, true);
+    }
+
+    @Bean
     public Queue chatMessagePersistQueue() {
         return new Queue(CHAT_MESSAGE_PERSIST_QUEUE, true);
+    }
+
+    @Bean
+    public Queue orderCancellationEmailQueue() {
+        return new Queue(ORDER_CANCELLATION_EMAIL_QUEUE, true);
+    }
+
+    @Bean
+    public Queue orderConfirmationEmailQueue() {
+        return new Queue(ORDER_CONFIRMATION_EMAIL_QUEUE, true);
     }
 
     @Bean
@@ -110,6 +131,16 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Binding orderCancellationEmailBinding(Queue orderCancellationEmailQueue, DirectExchange emailExchange) {
+        return BindingBuilder.bind(orderCancellationEmailQueue).to(emailExchange).with(ORDER_CANCELLATION_EMAIL_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding orderConfirmationEmailBinding(Queue orderConfirmationEmailQueue, DirectExchange emailExchange) {
+        return BindingBuilder.bind(orderConfirmationEmailQueue).to(emailExchange).with(ORDER_CONFIRMATION_EMAIL_ROUTING_KEY);
+    }
+
+    @Bean
     public Binding avatarUpdateBinding(Queue avatarUpdateQueue, DirectExchange emailExchange) {
         return BindingBuilder.bind(avatarUpdateQueue).to(emailExchange).with(AVATAR_UPDATE_ROUTING_KEY);
     }
@@ -137,6 +168,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding refundRequiredBinding(Queue refundRequiredQueue, DirectExchange orderExchange) {
         return BindingBuilder.bind(refundRequiredQueue).to(orderExchange).with(REFUND_REQUIRED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding orderShippingStatusBinding(Queue orderShippingStatusQueue, DirectExchange orderExchange) {
+        return BindingBuilder.bind(orderShippingStatusQueue).to(orderExchange).with(ORDER_SHIPPING_STATUS_ROUTING_KEY);
     }
 
     @Bean

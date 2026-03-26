@@ -24,6 +24,15 @@ public class ProductVariant {
 
     private String weight;    // VD: 3U/4U
     private String gripSize;  // VD: G4/G5
+    private String stiffness; // VD: Stiff, Medium
+    private String balancePoint; // VD: Head Heavy, Even Balance
+
+    // Dữ liệu đóng gói thực tế phục vụ tính cước GHN (đơn vị gram/cm)
+    private Integer shippingWeightGrams;
+    private Integer shippingLengthCm;
+    private Integer shippingWidthCm;
+    private Integer shippingHeightCm;
+
     @Column(nullable = false)
     private String size;      // Quần áo, giày
     @Column(nullable = false)

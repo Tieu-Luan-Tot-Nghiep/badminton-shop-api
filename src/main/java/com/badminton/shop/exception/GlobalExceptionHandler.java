@@ -1,6 +1,7 @@
 package com.badminton.shop.exception;
 
 import com.badminton.shop.common.dto.ApiResponse;
+import com.badminton.shop.modules.shipping.exception.ShippingIntegrationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -67,6 +68,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Object>> handleIllegalStateException(IllegalStateException ex) {
         return createErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
+    @ExceptionHandler(ShippingIntegrationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleShippingIntegrationException(ShippingIntegrationException ex) {
+        return createErrorResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
