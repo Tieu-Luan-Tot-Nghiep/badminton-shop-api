@@ -46,6 +46,33 @@ pipeline {
             }
         }
 
+        stage('Verify Env File') {
+            when {
+                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
+                    sh '''
+                        set -e
+
+                        cp "$ENV_FILE" .env
+                        ls -la .env
+
+                        # Show only variable names for safety.
+                        head -n 3 .env | sed 's/=.*$/=***masked***/'
+
+                        if grep -q '^AWS_REGION=' .env; then
+                            echo 'Bien AWS_REGION da ton tai trong file .env'
+                        else
+                            echo 'KHONG tim thay AWS_REGION trong file .env'
+                        fi
+
+                        rm -f .env
+                    '''
+                }
+            }
+        }
+
         stage('Push Image To ECR') {
             when {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
