@@ -15,7 +15,7 @@ pipeline {
         ECR_IMAGE_VERSION = "283209027400.dkr.ecr.us-east-1.amazonaws.com/badmintion-shop:${BUILD_NUMBER}"
         CONTAINER_NAME = 'badmintion-shop'
         HOST_PORT = '80'
-        CONTAINER_PORT = '8081'
+        CONTAINER_PORT = '8080'
     }
 
     stages {
@@ -69,6 +69,12 @@ pipeline {
                             echo 'Bien AWS_REGION da ton tai trong file .env'
                         else
                             echo 'KHONG tim thay AWS_REGION trong file .env'
+                        fi
+
+                        if grep -q '^CLIP_MODEL_PATH=' .env; then
+                            echo 'Bien CLIP_MODEL_PATH da ton tai trong file .env'
+                        else
+                            echo 'KHONG tim thay CLIP_MODEL_PATH trong file .env (se su dung gia tri rong khi run container)'
                         fi
 
                         rm -f .env
@@ -127,6 +133,8 @@ pipeline {
                             --restart unless-stopped \
                             --env-file .env \
                             -e SERVER_PORT="$CONTAINER_PORT" \
+                            -e CLIP_MODEL_PATH="" \
+                            -e CLIP_SERVICE_URL="" \
                             -p "$HOST_PORT:$CONTAINER_PORT" \
                             "$ECR_IMAGE_VERSION"
                     '''
