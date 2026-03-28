@@ -62,11 +62,13 @@ public class SecurityConfig {
                                 .requestMatchers("/api/inventory/system/**").hasRole("ADMIN")
                                 .requestMatchers("/api/inventory/admin/**").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.GET, "/api/reviews/my").authenticated()
-                            .requestMatchers(HttpMethod.GET, "/api/search/products/**", "/api/products/search/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/search/products/**", "/api/products/search/**","/api/search/products/image**").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/orders/vnpay-return", "/api/orders/vnpay-ipn").permitAll()
                             .requestMatchers(HttpMethod.GET, "/api/reviews/*", "/api/reviews/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/featured", "/api/products/new").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/cart/**", "/api/cart").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*").permitAll()
                         .requestMatchers("/ws-chat/**").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -90,5 +92,3 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 }
-
-
