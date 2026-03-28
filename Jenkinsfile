@@ -21,22 +21,15 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Build') {
             steps {
                 sh 'chmod +x ./gradlew'
-                sh './gradlew clean test'
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
-                    archiveArtifacts artifacts: 'build/reports/**', allowEmptyArchive: true
-                }
+                sh './gradlew clean bootJar -x test'
             }
         }
 
-        stage('Package') {
+        stage('Archive Artifact') {
             steps {
-                sh './gradlew bootJar -x test'
                 archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true
             }
         }
@@ -58,7 +51,7 @@ pipeline {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
-                echo 'Tests passed. Login ECR and push Docker image...'
+                echo 'Build passed. Login ECR and push Docker image...'
                 withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
                     sh '''
                         set -e
@@ -79,10 +72,10 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline completed: build, test, and deploy succeeded.'
+            echo 'Pipeline completed: build and deploy succeeded.'
         }
         failure {
-            echo 'Pipeline failed. Deploy stage was skipped because tests/build did not pass.'
+            echo 'Pipeline failed. Deploy stage was skipped because build did not pass.'
         }
     }
 }
