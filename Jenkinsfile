@@ -15,7 +15,7 @@ pipeline {
         ECR_IMAGE_VERSION = "283209027400.dkr.ecr.us-east-1.amazonaws.com/badmintion-shop:${BUILD_NUMBER}"
         CONTAINER_NAME = 'badmintion-shop'
         HOST_PORT = '80'
-        CONTAINER_PORT = '80'
+        CONTAINER_PORT = '8081'
     }
 
     stages {
@@ -126,6 +126,7 @@ pipeline {
                             --name "$CONTAINER_NAME" \
                             --restart unless-stopped \
                             --env-file .env \
+                            -e SERVER_PORT="$CONTAINER_PORT" \
                             -p "$HOST_PORT:$CONTAINER_PORT" \
                             "$ECR_IMAGE_VERSION"
                     '''
