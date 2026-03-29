@@ -19,6 +19,7 @@ pipeline {
         CLIP_CONTAINER_NAME = 'clip-local-service'
         CLIP_HOST_PORT = '8001'
         CLIP_CONTAINER_PORT = '8001'
+        DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     }
 
     stages {
@@ -35,6 +36,7 @@ pipeline {
 
                     echo '=== Disk usage before cleanup ==='
                     df -h
+                    df -ih || true
                     docker system df || true
 
                     # Free stale Docker artifacts to avoid Gradle/Build failures on low disk.
@@ -44,10 +46,24 @@ pipeline {
                     docker builder prune -af || true
 
                     rm -rf "$WORKSPACE/.gradle" || true
+                    rm -rf "$WORKSPACE/build" || true
+                    rm -rf "$WORKSPACE/tools/clip-local-service/.venv" || true
+                    rm -rf "$HOME/.cache/pip" || true
+
+                    # Prevent Docker json logs from filling the root disk.
+                    find /var/lib/docker/containers -name '*-json.log' -type f -size +100M -exec truncate -s 0 {} \; 2>/dev/null || true
 
                     echo '=== Disk usage after cleanup ==='
                     df -h
+                    df -ih || true
                     docker system df || true
+
+                    # Require at least 2GB free before build to avoid random Gradle failures.
+                    AVAIL_KB=$(df --output=avail / | tail -1 | tr -d ' ')
+                    if [ "$AVAIL_KB" -lt 2097152 ]; then
+                        echo 'ERROR: less than 2GB free on /. Please increase disk size or remove running containers/artifacts.'
+                        exit 1
+                    fi
                 '''
             }
         }
@@ -62,42 +78,6 @@ pipeline {
         stage('Archive Artifact') {
             steps {
                 archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true
-            }
-        }
-
-        stage('Run CLIP Service') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
-            steps {
-                sh '''
-                    set -e
-
-                    if docker ps -a --format '{{.Names}}' | grep -w "$CLIP_CONTAINER_NAME" >/dev/null 2>&1; then
-                        docker rm -f "$CLIP_CONTAINER_NAME"
-                    fi
-
-                    docker run -d \
-                      --name "$CLIP_CONTAINER_NAME" \
-                      --restart unless-stopped \
-                      -p "$CLIP_HOST_PORT:$CLIP_CONTAINER_PORT" \
-                      -v "$WORKSPACE/tools/clip-local-service:/app" \
-                      -w /app \
-                      python:3.11-slim \
-                      bash -lc "if [ ! -x .venv/bin/python ]; then python -m venv .venv; fi && . .venv/bin/activate && pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt && exec python -m uvicorn app:app --host 0.0.0.0 --port $CLIP_CONTAINER_PORT"
-
-                    for i in $(seq 1 180); do
-                        if curl -fsS "http://127.0.0.1:$CLIP_HOST_PORT/health" >/dev/null 2>&1; then
-                            echo "CLIP service is healthy on port $CLIP_HOST_PORT"
-                            exit 0
-                        fi
-                        sleep 2
-                    done
-
-                    echo "WARNING: CLIP service is still warming up. Recent logs:"
-                    docker logs "$CLIP_CONTAINER_NAME" --tail 100 || true
-                    echo "Continuing pipeline. CLIP service may become healthy shortly after deploy."
-                '''
             }
         }
 
@@ -159,89 +139,12 @@ pipeline {
             }
         }
 
-        stage('Run Elasticsearch') {
+        stage('Deploy With Docker Compose') {
             when {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
-                sh '''
-                    set -e
-
-                    if docker ps -a --format '{{.Names}}' | grep -w 'elasticsearch' >/dev/null 2>&1; then
-                        docker rm -f elasticsearch
-                    fi
-
-                    docker run -d \
-                      --name elasticsearch \
-                      -p 9200:9200 -p 9300:9300 \
-                      -e "discovery.type=single-node" \
-                      -e "xpack.security.enabled=false" \
-                      docker.elastic.co/elasticsearch/elasticsearch:8.10.0
-                '''
-            }
-        }
-
-        stage('Run RabbitMQ') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
-            steps {
-                sh '''
-                    set -e
-
-                    if docker ps -a --format '{{.Names}}' | grep -w 'rabbitmq-local' >/dev/null 2>&1; then
-                        docker rm -f rabbitmq-local
-                    fi
-
-                    docker run -d \
-                      --name rabbitmq-local \
-                      -p 5672:5672 -p 15672:15672 \
-                      -e RABBITMQ_DEFAULT_USER=qwwvmeiz \
-                      -e RABBITMQ_DEFAULT_PASS=EuohgWGTM2VGE7APABCoFP-rrCOXccgW \
-                      rabbitmq:3-management
-                '''
-            }
-        }
-
-        stage('Run Redis') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
-            steps {
-                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
-                    sh '''
-                        set -e
-
-                        cp "$ENV_FILE" .env
-                        trap 'rm -f .env' EXIT
-
-                        set -a
-                        . ./.env
-                        set +a
-
-                        : "${REDIS_PASSWORD:?Missing REDIS_PASSWORD in .env}"
-
-                        if docker ps -a --format '{{.Names}}' | grep -w 'redis-local' >/dev/null 2>&1; then
-                            docker rm -f redis-local
-                        fi
-
-                        docker run -d \
-                          --name redis-local \
-                          -p 6379:6379 \
-                          --network host \
-                          redis:latest \
-                          redis-server --requirepass "$REDIS_PASSWORD"
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy Latest Container') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
-            steps {
-                echo 'Pull and run the newest image version...'
+                echo 'Pull and run services by Docker Compose...'
                 withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
                     sh '''
                         set -e
@@ -250,22 +153,42 @@ pipeline {
                         trap 'rm -f .env' EXIT
 
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-                        docker pull $ECR_IMAGE_VERSION
 
-                        if docker ps -a --format '{{.Names}}' | grep -w "$CONTAINER_NAME" >/dev/null 2>&1; then
-                            docker rm -f "$CONTAINER_NAME"
+                        if docker compose version >/dev/null 2>&1; then
+                            COMPOSE_CMD="docker compose"
+                        elif command -v docker-compose >/dev/null 2>&1; then
+                            COMPOSE_CMD="docker-compose"
+                        else
+                            echo 'ERROR: Docker Compose is not installed on this Jenkins agent.'
+                            exit 1
                         fi
 
-                        docker run -d \
-                            --name "$CONTAINER_NAME" \
-                            --restart unless-stopped \
-                            --env-file .env \
-                            -e SERVER_PORT="$CONTAINER_PORT" \
-                            -p "$HOST_PORT:$CONTAINER_PORT" \
-                            "$ECR_IMAGE_VERSION"
+                        export APP_IMAGE="$ECR_IMAGE_VERSION"
+                        export HOST_PORT="$HOST_PORT"
+                        export CONTAINER_PORT="$CONTAINER_PORT"
+                        export CONTAINER_NAME="$CONTAINER_NAME"
+                        export CLIP_CONTAINER_NAME="$CLIP_CONTAINER_NAME"
+                        export CLIP_HOST_PORT="$CLIP_HOST_PORT"
+                        export CLIP_CONTAINER_PORT="$CLIP_CONTAINER_PORT"
+
+                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" pull app || true
+                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
+                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" ps
+
+                        for i in $(seq 1 90); do
+                            if curl -fsS "http://127.0.0.1:$HOST_PORT" >/dev/null 2>&1; then
+                                echo "Application is reachable at http://127.0.0.1:$HOST_PORT"
+                                exit 0
+                            fi
+                            sleep 2
+                        done
+
+                        echo 'Application did not become reachable in time. Recent app logs:'
+                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" logs --tail=120 app || true
+                        exit 1
                     '''
                 }
-                echo "Container ${CONTAINER_NAME} is running with image ${ECR_IMAGE_VERSION}."
+                echo "Services were deployed by Docker Compose using image ${ECR_IMAGE_VERSION}."
             }
         }
     }

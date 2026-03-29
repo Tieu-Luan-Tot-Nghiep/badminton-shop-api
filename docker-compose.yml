@@ -1,0 +1,78 @@
+services:
+  app:
+    container_name: ${CONTAINER_NAME:-badmintion-shop}
+    image: ${APP_IMAGE:-badmintion-shop:latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SERVER_PORT: ${CONTAINER_PORT:-8080}
+      CLIP_SERVICE_URL: http://clip-local-service:8001
+      # RABBITMQ_ADDRESSES should be set in .env, e.g. amqp://user:pass@rabbitmq-local:5672
+    ports:
+      - "${HOST_PORT:-80}:${CONTAINER_PORT:-8080}"
+    depends_on:
+      clip-local-service:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+      rabbitmq-local:
+        condition: service_started
+      redis-local:
+        condition: service_started
+
+  clip-local-service:
+    container_name: ${CLIP_CONTAINER_NAME:-clip-local-service}
+    image: python:3.11-slim
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./tools/clip-local-service:/app
+    command: >
+      bash -lc "if [ ! -x .venv/bin/python ]; then python -m venv .venv; fi
+      && . .venv/bin/activate
+      && pip install --upgrade pip
+      && pip install --no-cache-dir -r requirements.txt
+      && exec python -m uvicorn app:app --host 0.0.0.0 --port ${CLIP_CONTAINER_PORT:-8001}"
+    ports:
+      - "${CLIP_HOST_PORT:-8001}:${CLIP_CONTAINER_PORT:-8001}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+
+  rabbitmq-local:
+    container_name: rabbitmq-local
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis-local:
+    container_name: redis-local
+    image: redis:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["sh", "-c", "redis-server --requirepass ${REDIS_PASSWORD}"]
+    ports:
+      - "6379:6379"
