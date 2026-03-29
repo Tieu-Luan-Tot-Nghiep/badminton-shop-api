@@ -51,7 +51,7 @@ pipeline {
                     rm -rf "$HOME/.cache/pip" || true
 
                     # Prevent Docker json logs from filling the root disk.
-                    find /var/lib/docker/containers -name '*-json.log' -type f -size +100M -exec truncate -s 0 {} \; 2>/dev/null || true
+                    find /var/lib/docker/containers -name '*-json.log' -type f -size +100M -exec truncate -s 0 {} ';' 2>/dev/null || true
 
                     echo '=== Disk usage after cleanup ==='
                     df -h
