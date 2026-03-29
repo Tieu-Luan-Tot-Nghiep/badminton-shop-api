@@ -16,9 +16,7 @@ pipeline {
         CONTAINER_NAME = 'badmintion-shop'
         HOST_PORT = '80'
         CONTAINER_PORT = '8080'
-        CLIP_CONTAINER_NAME = 'clip-local-service'
-        CLIP_HOST_PORT = '8001'
-        CLIP_CONTAINER_PORT = '8001'
+        // CLIP/Python service removed
         DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     }
 
@@ -167,9 +165,7 @@ pipeline {
                         export HOST_PORT="$HOST_PORT"
                         export CONTAINER_PORT="$CONTAINER_PORT"
                         export CONTAINER_NAME="$CONTAINER_NAME"
-                        export CLIP_CONTAINER_NAME="$CLIP_CONTAINER_NAME"
-                        export CLIP_HOST_PORT="$CLIP_HOST_PORT"
-                        export CLIP_CONTAINER_PORT="$CLIP_CONTAINER_PORT"
+                        # CLIP/Python service removed
 
                         $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" pull app || true
                         $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
