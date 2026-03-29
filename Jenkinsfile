@@ -135,40 +135,20 @@ pipeline {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
-                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
-                    sh '''
-                        set -e
+                sh '''
+                    set -e
 
-                        cp "$ENV_FILE" .env
-                        trap 'rm -f .env' EXIT
+                    if docker ps -a --format '{{.Names}}' | grep -w 'rabbitmq-local' >/dev/null 2>&1; then
+                        docker rm -f rabbitmq-local
+                    fi
 
-                        set -a
-                        . ./.env
-                        set +a
-
-                        : "${RABBITMQ_ADDRESSES:?Missing RABBITMQ_ADDRESSES in .env}"
-
-                        RABBITMQ_URL=$(printf '%s' "$RABBITMQ_ADDRESSES" | cut -d',' -f1)
-                        RABBITMQ_DEFAULT_USER=$(printf '%s' "$RABBITMQ_URL" | sed -E 's#^amqps?://([^:]+):.*#\1#')
-                        RABBITMQ_DEFAULT_PASS=$(printf '%s' "$RABBITMQ_URL" | sed -E 's#^amqps?://[^:]+:([^@]+)@.*#\1#')
-
-                        if [ -z "$RABBITMQ_DEFAULT_USER" ] || [ -z "$RABBITMQ_DEFAULT_PASS" ]; then
-                            echo 'Khong parse duoc user/password tu RABBITMQ_ADDRESSES (format can la amqp://user:password@host:port)'
-                            exit 1
-                        fi
-
-                        if docker ps -a --format '{{.Names}}' | grep -w 'rabbitmq-local' >/dev/null 2>&1; then
-                            docker rm -f rabbitmq-local
-                        fi
-
-                        docker run -d \
-                          --name rabbitmq-local \
-                          -p 5672:5672 -p 15672:15672 \
-                          -e RABBITMQ_DEFAULT_USER="$RABBITMQ_DEFAULT_USER" \
-                          -e RABBITMQ_DEFAULT_PASS="$RABBITMQ_DEFAULT_PASS" \
-                          rabbitmq:3-management
-                    '''
-                }
+                    docker run -d \
+                      --name rabbitmq-local \
+                      -p 5672:5672 -p 15672:15672 \
+                      -e RABBITMQ_DEFAULT_USER=qwwvmeiz \
+                      -e RABBITMQ_DEFAULT_PASS=EuohgWGTM2VGE7APABCoFP-rrCOXccgW \
+                      rabbitmq:3-management
+                '''
             }
         }
 
@@ -229,8 +209,6 @@ pipeline {
                             --restart unless-stopped \
                             --env-file .env \
                             -e SERVER_PORT="$CONTAINER_PORT" \
-                            -e CLIP_MODEL_PATH="" \
-                            -e CLIP_SERVICE_URL="" \
                             -p "$HOST_PORT:$CONTAINER_PORT" \
                             "$ECR_IMAGE_VERSION"
                     '''
