@@ -28,10 +28,34 @@ pipeline {
             }
         }
 
+        stage('Disk Preflight') {
+            steps {
+                sh '''
+                    set -e
+
+                    echo '=== Disk usage before cleanup ==='
+                    df -h
+                    docker system df || true
+
+                    # Free stale Docker artifacts to avoid Gradle/Build failures on low disk.
+                    docker container prune -f || true
+                    docker image prune -af --filter 'until=24h' || true
+                    docker volume prune -f || true
+                    docker builder prune -af || true
+
+                    rm -rf "$WORKSPACE/.gradle" || true
+
+                    echo '=== Disk usage after cleanup ==='
+                    df -h
+                    docker system df || true
+                '''
+            }
+        }
+
         stage('Build') {
             steps {
                 sh 'chmod +x ./gradlew'
-                sh './gradlew clean bootJar -x test'
+                sh 'GRADLE_USER_HOME="$WORKSPACE/.gradle" ./gradlew clean bootJar -x test --no-daemon'
             }
         }
 
