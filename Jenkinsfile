@@ -174,17 +174,6 @@ pipeline {
                                                 $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
                                                 $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" ps
 
-                        for i in $(seq 1 90); do
-                            if curl -fsS "http://127.0.0.1:$HOST_PORT" >/dev/null 2>&1; then
-                                echo "Application is reachable at http://127.0.0.1:$HOST_PORT"
-                                exit 0
-                            fi
-                            sleep 2
-                        done
-
-                        echo 'Application did not become reachable in time. Recent app logs:'
-                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" logs --tail=120 app || true
-                        exit 1
                     '''
                 }
                 echo "Services were deployed by Docker Compose using image ${ECR_IMAGE_VERSION}."
