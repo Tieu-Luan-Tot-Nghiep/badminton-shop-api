@@ -130,6 +130,80 @@ pipeline {
             }
         }
 
+        stage('Run RabbitMQ') {
+            when {
+                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
+                    sh '''
+                        set -e
+
+                        cp "$ENV_FILE" .env
+                        trap 'rm -f .env' EXIT
+
+                        set -a
+                        . ./.env
+                        set +a
+
+                        : "${RABBITMQ_ADDRESSES:?Missing RABBITMQ_ADDRESSES in .env}"
+
+                        RABBITMQ_URL=$(printf '%s' "$RABBITMQ_ADDRESSES" | cut -d',' -f1)
+                        RABBITMQ_DEFAULT_USER=$(printf '%s' "$RABBITMQ_URL" | sed -E 's#^amqps?://([^:]+):.*#\1#')
+                        RABBITMQ_DEFAULT_PASS=$(printf '%s' "$RABBITMQ_URL" | sed -E 's#^amqps?://[^:]+:([^@]+)@.*#\1#')
+
+                        if [ -z "$RABBITMQ_DEFAULT_USER" ] || [ -z "$RABBITMQ_DEFAULT_PASS" ]; then
+                            echo 'Khong parse duoc user/password tu RABBITMQ_ADDRESSES (format can la amqp://user:password@host:port)'
+                            exit 1
+                        fi
+
+                        if docker ps -a --format '{{.Names}}' | grep -w 'rabbitmq-local' >/dev/null 2>&1; then
+                            docker rm -f rabbitmq-local
+                        fi
+
+                        docker run -d \
+                          --name rabbitmq-local \
+                          -p 5672:5672 -p 15672:15672 \
+                          -e RABBITMQ_DEFAULT_USER="$RABBITMQ_DEFAULT_USER" \
+                          -e RABBITMQ_DEFAULT_PASS="$RABBITMQ_DEFAULT_PASS" \
+                          rabbitmq:3-management
+                    '''
+                }
+            }
+        }
+
+        stage('Run Redis') {
+            when {
+                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
+                    sh '''
+                        set -e
+
+                        cp "$ENV_FILE" .env
+                        trap 'rm -f .env' EXIT
+
+                        set -a
+                        . ./.env
+                        set +a
+
+                        : "${REDIS_PASSWORD:?Missing REDIS_PASSWORD in .env}"
+
+                        if docker ps -a --format '{{.Names}}' | grep -w 'redis-local' >/dev/null 2>&1; then
+                            docker rm -f redis-local
+                        fi
+
+                        docker run -d \
+                          --name redis-local \
+                          -p 6379:6379 \
+                          redis:latest \
+                          redis-server --requirepass "$REDIS_PASSWORD"
+                    '''
+                }
+            }
+        }
+
         stage('Deploy Latest Container') {
             when {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
