@@ -177,6 +177,7 @@ pipeline {
                         docker run -d \
                           --name redis-local \
                           -p 6379:6379 \
+                          --network host \
                           redis:latest \
                           redis-server --requirepass "$REDIS_PASSWORD"
                     '''
