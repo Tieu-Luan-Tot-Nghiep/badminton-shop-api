@@ -108,6 +108,28 @@ pipeline {
             }
         }
 
+        stage('Run Elasticsearch') {
+            when {
+                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                sh '''
+                    set -e
+
+                    if docker ps -a --format '{{.Names}}' | grep -w 'elasticsearch' >/dev/null 2>&1; then
+                        docker rm -f elasticsearch
+                    fi
+
+                    docker run -d \
+                      --name elasticsearch \
+                      -p 9200:9200 -p 9300:9300 \
+                      -e "discovery.type=single-node" \
+                      -e "xpack.security.enabled=false" \
+                      docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+                '''
+            }
+        }
+
         stage('Deploy Latest Container') {
             when {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
