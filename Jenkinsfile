@@ -45,7 +45,6 @@ pipeline {
 
                     rm -rf "$WORKSPACE/.gradle" || true
                     rm -rf "$WORKSPACE/build" || true
-                    rm -rf "$WORKSPACE/tools/clip-local-service/.venv" || true
                     rm -rf "$HOME/.cache/pip" || true
 
                     # Prevent Docker json logs from filling the root disk.
@@ -167,9 +166,13 @@ pipeline {
                         export CONTAINER_NAME="$CONTAINER_NAME"
                         # CLIP/Python service removed
 
-                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" pull app || true
-                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
-                        $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" ps
+                                                # Remove old container if exists to avoid name conflict
+                                                if docker ps -a --format '{{.Names}}' | grep -w "$CONTAINER_NAME" >/dev/null 2>&1; then
+                                                    docker rm -f "$CONTAINER_NAME"
+                                                fi
+                                                $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" pull app || true
+                                                $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
+                                                $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" ps
 
                         for i in $(seq 1 90); do
                             if curl -fsS "http://127.0.0.1:$HOST_PORT" >/dev/null 2>&1; then
