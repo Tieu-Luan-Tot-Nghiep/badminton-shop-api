@@ -16,6 +16,9 @@ pipeline {
         CONTAINER_NAME = 'badmintion-shop'
         HOST_PORT = '80'
         CONTAINER_PORT = '8080'
+        CLIP_CONTAINER_NAME = 'clip-local-service'
+        CLIP_HOST_PORT = '8001'
+        CLIP_CONTAINER_PORT = '8001'
     }
 
     stages {
@@ -38,14 +41,38 @@ pipeline {
             }
         }
 
-        stage('Run Tools app.py') {
+        stage('Run CLIP Service') {
             when {
                 expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
                 sh '''
                     set -e
-                    timeout 60s python3 -m uvicorn --app-dir tools/clip-local-service app:app --host 0.0.0.0 --port 8001 || true
+
+                    if docker ps -a --format '{{.Names}}' | grep -w "$CLIP_CONTAINER_NAME" >/dev/null 2>&1; then
+                        docker rm -f "$CLIP_CONTAINER_NAME"
+                    fi
+
+                    docker run -d \
+                      --name "$CLIP_CONTAINER_NAME" \
+                      --restart unless-stopped \
+                      -p "$CLIP_HOST_PORT:$CLIP_CONTAINER_PORT" \
+                      -v "$WORKSPACE/tools/clip-local-service:/app" \
+                      -w /app \
+                      python:3.11-slim \
+                      bash -lc "pip install --no-cache-dir -r requirements.txt && python -m uvicorn app:app --host 0.0.0.0 --port $CLIP_CONTAINER_PORT"
+
+                    for i in $(seq 1 30); do
+                        if curl -fsS "http://127.0.0.1:$CLIP_HOST_PORT/health" >/dev/null 2>&1; then
+                            echo "CLIP service is healthy on port $CLIP_HOST_PORT"
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+
+                    echo "CLIP service did not become healthy in time. Recent logs:"
+                    docker logs "$CLIP_CONTAINER_NAME" --tail 100 || true
+                    exit 1
                 '''
             }
         }
