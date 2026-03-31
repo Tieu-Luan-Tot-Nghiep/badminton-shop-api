@@ -185,9 +185,7 @@ public class EmbeddingService {
         if (model != null) {
             model.close();
         }
-        if (clipImageModel != null) {
-            clipImageModel.close();
-        }
+        // clipImageModel đã bị loại bỏ hoàn toàn
     }
 }
 
