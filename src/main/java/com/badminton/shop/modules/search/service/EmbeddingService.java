@@ -32,11 +32,9 @@ public class EmbeddingService {
     private static final int CLIP_VECTOR_DIMS = 512;
 
     private ZooModel<String, float[]> model;
-    private ZooModel<Image, byte[]> clipImageModel;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${app.search.clip.model-path:}")
-    private String clipModelPath;
+    // Removed local CLIP model path
 
     @Value("${app.search.clip.service-url:}")
     private String clipServiceUrl;
@@ -58,34 +56,16 @@ public class EmbeddingService {
             log.error("Failed to load Embedding Model", e);
         }
 
-        if (clipModelPath != null && !clipModelPath.isBlank()) {
-            try {
-                Criteria<Image, byte[]> clipCriteria = Criteria.builder()
-                        .setTypes(Image.class, byte[].class)
-                        .optModelPath(Paths.get(clipModelPath))
-                        .optTranslator(ImageFeatureExtractor.builder().build())
-                        .optEngine("PyTorch")
-                        .optProgress(new ProgressBar())
-                        .build();
-
-                this.clipImageModel = clipCriteria.loadModel();
-                log.info("Successfully loaded CLIP image model from path: {}", clipModelPath);
-                return;
-            } catch (Exception e) {
-                log.error("Failed to load CLIP image model from local path: {}", clipModelPath, e);
-            }
-        }
-
         if (clipServiceUrl != null && !clipServiceUrl.isBlank()) {
-            log.info("CLIP image embedding will use local service at: {}", clipServiceUrl);
+            log.info("CLIP image embedding will use remote service at: {}", clipServiceUrl);
             return;
         }
 
-        log.warn("CLIP image embedding provider is not configured. Set app.search.clip.model-path or app.search.clip.service-url.");
+        log.warn("CLIP image embedding provider is not configured. Set app.search.clip.service-url.");
     }
 
     public boolean isImageEmbeddingAvailable() {
-        return clipImageModel != null || (clipServiceUrl != null && !clipServiceUrl.isBlank());
+        return clipServiceUrl != null && !clipServiceUrl.isBlank();
     }
 
     public float[] embed(String text) {
@@ -102,32 +82,12 @@ public class EmbeddingService {
         if (imageBytes == null || imageBytes.length == 0) {
             return new float[CLIP_VECTOR_DIMS];
         }
-
-        if (clipImageModel != null) {
-            return embedImageWithLocalModel(imageBytes);
-        }
-
         if (clipServiceUrl != null && !clipServiceUrl.isBlank()) {
             return embedImageWithLocalService(imageBytes);
         }
-
         return new float[CLIP_VECTOR_DIMS];
     }
 
-    private float[] embedImageWithLocalModel(byte[] imageBytes) {
-        try {
-            try (InputStream inputStream = new ByteArrayInputStream(imageBytes);
-                 Predictor<Image, byte[]> predictor = clipImageModel.newPredictor()) {
-                Image image = ImageFactory.getInstance().fromInputStream(inputStream);
-                byte[] rawOutput = predictor.predict(image);
-                float[] vector = bytesToFloatArray(rawOutput);
-                return resizeVector(vector, CLIP_VECTOR_DIMS);
-            }
-        } catch (Exception e) {
-            log.error("Error during image embedding generation with local model", e);
-            return new float[CLIP_VECTOR_DIMS];
-        }
-    }
 
     private float[] embedImageWithLocalService(byte[] imageBytes) {
         HttpURLConnection connection = null;
