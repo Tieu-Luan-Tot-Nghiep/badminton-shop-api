@@ -15,7 +15,7 @@ import java.security.Principal;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/orders/admin/returns")
+@RequestMapping("/api/admin/returns")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminReturnController {
