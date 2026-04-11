@@ -305,4 +305,41 @@ public class PromotionServiceImpl implements PromotionService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PromotionResponse getPromotionById(Long id) {
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with id: " + id));
+        return toResponse(promotion);
+    }
+
+    @Override
+    public void deletePromotion(Long id) {
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with id: " + id));
+        promotionRepository.delete(promotion);
+        evictPromotionCache(promotion.getCode());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> adminGetPromotionStats() {
+        long total = promotionRepository.count();
+        long active = promotionRepository.countByIsActiveTrue();
+        long inactive = total - active;
+        // In a real app we might sum usages or find expired. 
+        // For now, return basic stats.
+        return java.util.Map.of(
+            "total", total,
+            "active", active,
+            "inactive", inactive
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Object> adminGetPromotionUsages(Long id, int page, int size) {
+        // Mocking usage response since we don't have a Usage table yet
+        return Page.empty();
+    }
 }

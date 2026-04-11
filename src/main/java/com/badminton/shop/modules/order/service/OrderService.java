@@ -40,4 +40,25 @@ public interface OrderService {
 	ReturnRequestResponse receiveReturnedItems(Long returnRequestId, String adminName, ReceiveReturnRequest request);
 
 	ReturnRequestResponse markReturnRefunded(Long returnRequestId, String adminName, String note);
+
+    Page<OrderResponse> adminGetOrders(
+            String keyword,
+            String status,
+            String paymentStatus,
+            String paymentMethod,
+            java.time.LocalDateTime from,
+            java.time.LocalDateTime to,
+            int page,
+            int size
+    );
+
+    OrderResponse adminGetOrder(String orderCode);
+
+    OrderResponse adminUpdateOrderStatus(String orderCode, String status, String note, String adminName);
+
+    OrderResponse adminAssignShipping(String orderCode, String shippingCode, String shippingProvider, java.time.LocalDateTime expectedDeliveryAt, String adminName);
+
+    Page<ReturnRequestResponse> adminGetReturns(String keyword, String status, int page, int size);
+
+    java.util.Map<String, Long> adminGetReturnStats();
 }

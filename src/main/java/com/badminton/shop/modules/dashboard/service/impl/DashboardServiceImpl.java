@@ -167,4 +167,23 @@ public class DashboardServiceImpl implements DashboardService {
         
         return new InventoryValueResponse(totalStockQuantity, estimatedValue);
     }
+    @Override
+    public java.util.Map<String, Object> getKpis() {
+        return java.util.Map.of(
+            "totalRevenue", BigDecimal.ZERO,
+            "totalOrders", 0,
+            "totalCustomers", 0,
+            "totalProducts", 0
+        );
+    }
+
+    @Override
+    public List<Object> getRecentOrders() {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public List<Object> getAlerts() {
+        return new ArrayList<>();
+    }
 }

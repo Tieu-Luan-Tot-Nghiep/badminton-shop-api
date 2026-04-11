@@ -68,4 +68,22 @@ public class DashboardController {
         InventoryValueResponse data = dashboardService.getInventoryValue();
         return ResponseEntity.ok(ApiResponse.success("Lấy thống kê giá trị tồn kho thành công", data));
     }
+
+    @GetMapping("/kpis")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getKpis() {
+        java.util.Map<String, Object> data = dashboardService.getKpis();
+        return ResponseEntity.ok(ApiResponse.success("Lấy KPIs thành công", data));
+    }
+
+    @GetMapping("/recent-orders")
+    public ResponseEntity<ApiResponse<List<Object>>> getRecentOrders() {
+        List<Object> data = dashboardService.getRecentOrders();
+        return ResponseEntity.ok(ApiResponse.success("Lấy đơn hàng gần đây thành công", data));
+    }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<ApiResponse<List<Object>>> getAlerts() {
+        List<Object> data = dashboardService.getAlerts();
+        return ResponseEntity.ok(ApiResponse.success("Lấy cảnh báo (alerts) thành công", data));
+    }
 }

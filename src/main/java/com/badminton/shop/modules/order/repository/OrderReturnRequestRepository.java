@@ -8,7 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Collection;
 import java.util.Optional;
 
-public interface OrderReturnRequestRepository extends JpaRepository<OrderReturnRequest, Long> {
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+public interface OrderReturnRequestRepository extends JpaRepository<OrderReturnRequest, Long>, JpaSpecificationExecutor<OrderReturnRequest> {
 
     @EntityGraph(attributePaths = {
             "order", "order.items", "order.items.variant", "order.items.variant.product", "order.user",

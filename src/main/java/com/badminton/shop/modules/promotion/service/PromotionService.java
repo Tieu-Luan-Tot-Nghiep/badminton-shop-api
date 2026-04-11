@@ -25,4 +25,12 @@ public interface PromotionService {
     PromotionApplyResult applyPromotionForOrder(String voucherCode, BigDecimal itemsAmount, BigDecimal shippingFee);
 
     void publishPromotionUsage(Long promotionId, String orderCode);
+
+    PromotionResponse getPromotionById(Long id);
+
+    void deletePromotion(Long id);
+
+    java.util.Map<String, Object> adminGetPromotionStats();
+
+    Page<Object> adminGetPromotionUsages(Long id, int page, int size);
 }

@@ -339,6 +339,13 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
+        java.util.List<String> permissions = new java.util.ArrayList<>();
+        if (user.getRole() == Role.ADMIN) {
+            permissions = java.util.Arrays.asList(
+                "MANAGE_USERS", "MANAGE_ORDERS", "DASHBOARD", "MANAGE_PRODUCTS", "MANAGE_CHAT", "MANAGE_PROMOTIONS"
+            );
+        }
+
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName() != null ? user.getFullName() : user.getUsername())
@@ -346,6 +353,7 @@ public class AuthServiceImpl implements AuthService {
                 .birthDate(user.getBirthDate())
                 .avatar(user.getAvatar())
                 .role(user.getRole().name())
+                .permissions(permissions)
                 .build();
     }
 

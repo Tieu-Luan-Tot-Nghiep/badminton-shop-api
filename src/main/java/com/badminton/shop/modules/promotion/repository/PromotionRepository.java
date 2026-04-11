@@ -13,4 +13,6 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
     boolean existsByCodeIgnoreCase(String code);
 
     Page<Promotion> findAllByIsActiveTrue(Pageable pageable);
+
+    long countByIsActiveTrue();
 }

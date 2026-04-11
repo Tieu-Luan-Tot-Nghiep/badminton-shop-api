@@ -1180,4 +1180,92 @@ public class OrderServiceImpl implements OrderService {
                 String message
             ) {
             }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> adminGetOrders(String keyword, String status, String paymentStatus, String paymentMethod, LocalDateTime from, LocalDateTime to, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        org.springframework.data.jpa.domain.Specification<Order> spec = com.badminton.shop.modules.order.repository.OrderSpecification.filterOrders(keyword, status, paymentStatus, paymentMethod, from, to);
+        return orderRepository.findAll(spec, pageable).map(order -> toOrderResponse(order, null));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse adminGetOrder(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+        return toOrderResponse(order, null);
+    }
+
+    @Override
+    public OrderResponse adminUpdateOrderStatus(String orderCode, String statusStr, String note, String adminName) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+        OrderStatus newStatus;
+        try {
+            newStatus = OrderStatus.valueOf(statusStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Trạng thái không hợp lệ: " + statusStr);
+        }
+        
+        order.setStatus(newStatus);
+        
+        // Handle payment status if necessary based on your logic 
+        // Example: if status is DELIVERED and payment is COD, mark it COMPLETED?
+        if (newStatus == OrderStatus.DELIVERED && order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.PENDING) {
+            order.setPaymentStatus(PaymentStatus.COMPLETED);
+        }
+
+        order.getHistories().add(OrderHistory.builder()
+                .order(order)
+                .status(newStatus)
+                .note("Trạng thái cập nhật bởi Admin: " + safe(note) + " (" + adminName + ")")
+                .build());
+
+        Order saved = orderRepository.save(order);
+        return toOrderResponse(saved, null);
+    }
+
+    @Override
+    public OrderResponse adminAssignShipping(String orderCode, String shippingCode, String shippingProvider, LocalDateTime expectedDeliveryAt, String adminName) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+        
+        if (order.getStatus() != OrderStatus.CONFIRMED && order.getStatus() != OrderStatus.SHIPPING) {
+            throw new IllegalArgumentException("Không thể gán thông tin giao hàng khi đơn ở trạng thái: " + order.getStatus());
+        }
+
+        order.setShippingCode(shippingCode);
+        order.setShippingProvider(shippingProvider);
+        if (expectedDeliveryAt != null) {
+            order.setShippingExpectedDeliveryAt(expectedDeliveryAt);
+        }
+        order.setStatus(OrderStatus.SHIPPING);
+        
+        order.getHistories().add(OrderHistory.builder()
+                .order(order)
+                .status(OrderStatus.SHIPPING)
+                .note("Gán thông tin giao hàng: Mã " + shippingCode + " (" + adminName + ")")
+                .build());
+
+        Order saved = orderRepository.save(order);
+        return toOrderResponse(saved, null);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReturnRequestResponse> adminGetReturns(String keyword, String status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        org.springframework.data.jpa.domain.Specification<OrderReturnRequest> spec = com.badminton.shop.modules.order.repository.OrderReturnSpecification.filterReturns(keyword, status);
+        return orderReturnRequestRepository.findAll(spec, pageable).map(this::toReturnRequestResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> adminGetReturnStats() {
+        java.util.Map<String, Long> stats = new java.util.HashMap<>();
+        for (ReturnRequestStatus status : ReturnRequestStatus.values()) {
+            long count = orderReturnRequestRepository.count((root, query, cb) -> cb.equal(root.get("status"), status));
+            stats.put(status.name(), count);
+        }
+        return stats;
+    }
 }

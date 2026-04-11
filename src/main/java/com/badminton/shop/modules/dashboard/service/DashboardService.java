@@ -9,4 +9,7 @@ public interface DashboardService {
     List<BrandRevenueResponse> getRevenueByBrand(LocalDateTime startDate, LocalDateTime endDate);
     List<TopSellingResponse> getTopSellingProducts(LocalDateTime startDate, LocalDateTime endDate, int limit);
     InventoryValueResponse getInventoryValue();
+    java.util.Map<String, Object> getKpis();
+    List<Object> getRecentOrders();
+    List<Object> getAlerts();
 }
