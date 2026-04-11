@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping("/api/chat/admin")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminChatController {
@@ -19,7 +19,7 @@ public class AdminChatController {
     // Đây là mock controller theo yêu cầu để UI Admin có thể tích hợp.
     // Các logic này sẽ cần ChatService tĩnh hoặc tích hợp websocket sau.
 
-    @GetMapping("/admin/inbox")
+    @GetMapping("/inbox")
     public ResponseEntity<ApiResponse<List<Object>>> getInbox() {
         return ResponseEntity.ok(ApiResponse.success("Get inbox successful", Collections.emptyList()));
     }
@@ -43,7 +43,7 @@ public class AdminChatController {
         return ResponseEntity.ok(ApiResponse.success("Marked as read", null));
     }
 
-    @GetMapping("/admin/unread-summary")
+    @GetMapping("/unread-summary")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> getUnreadSummary() {
         return ResponseEntity.ok(ApiResponse.success("Get unread summary successful", Map.of("totalUnread", 0)));
     }
