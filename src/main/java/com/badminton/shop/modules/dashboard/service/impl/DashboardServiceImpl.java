@@ -43,7 +43,9 @@ public class DashboardServiceImpl implements DashboardService {
                 SUM(o.total_amount) as totalRevenue,
                 COUNT(o.id) as totalOrders
             FROM orders o
-            WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'REFUNDED') 
+                        WHERE (o.payment_status = 'COMPLETED' OR o.status = 'DELIVERED')
+                            AND o.status NOT IN ('CANCELLED', 'RETURNED', 'REFUNDED', 'RETURN_REQUESTED', 'AWAITING_RETURN', 'RETURN_RECEIVED')
+                            AND o.payment_status <> 'REFUNDED'
               AND o.created_at >= :startDate 
               AND o.created_at <= :endDate
             GROUP BY TO_CHAR(o.created_at, '%s')
@@ -80,7 +82,9 @@ public class DashboardServiceImpl implements DashboardService {
             JOIN product_variants pv ON oi.variant_id = pv.id
             JOIN products p ON pv.product_id = p.id
             JOIN brands b ON p.brand_id = b.id
-            WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'REFUNDED')
+                        WHERE (o.payment_status = 'COMPLETED' OR o.status = 'DELIVERED')
+                            AND o.status NOT IN ('CANCELLED', 'RETURNED', 'REFUNDED', 'RETURN_REQUESTED', 'AWAITING_RETURN', 'RETURN_RECEIVED')
+                            AND o.payment_status <> 'REFUNDED'
               AND o.created_at >= :startDate 
               AND o.created_at <= :endDate
             GROUP BY b.name
@@ -119,7 +123,9 @@ public class DashboardServiceImpl implements DashboardService {
             JOIN orders o ON oi.order_id = o.id
             JOIN product_variants pv ON oi.variant_id = pv.id
             JOIN products p ON pv.product_id = p.id
-            WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'REFUNDED')
+                        WHERE (o.payment_status = 'COMPLETED' OR o.status = 'DELIVERED')
+                            AND o.status NOT IN ('CANCELLED', 'RETURNED', 'REFUNDED', 'RETURN_REQUESTED', 'AWAITING_RETURN', 'RETURN_RECEIVED')
+                            AND o.payment_status <> 'REFUNDED'
               AND o.created_at >= :startDate 
               AND o.created_at <= :endDate
             GROUP BY p.id, p.name, p.slug, p.thumbnail_url
