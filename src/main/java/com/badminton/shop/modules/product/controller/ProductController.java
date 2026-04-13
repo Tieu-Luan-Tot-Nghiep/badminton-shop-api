@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -151,7 +152,7 @@ public class ProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
 
-        Sort sort = buildSort(sortBy, sortDir);
+        Sort sort = buildAdminSort(sortBy, sortDir);
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<ProductListResponse> products = productService.getAdminProducts(
@@ -279,6 +280,18 @@ public class ProductController {
                     ? Sort.Order.asc("name") : Sort.Order.desc("name"));
             default -> Sort.by(sortDir.equalsIgnoreCase("asc")
                     ? Sort.Order.asc("createdAt") : Sort.Order.desc("createdAt"));
+        };
+    }
+
+    private Sort buildAdminSort(String sortBy, String sortDir) {
+        Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+
+        return switch (sortBy) {
+            case "price" -> JpaSort.unsafe(direction, "p.base_price");
+            case "name" -> JpaSort.unsafe(direction, "p.name");
+            case "updatedAt" -> JpaSort.unsafe(direction, "p.updated_at");
+            case "id" -> JpaSort.unsafe(direction, "p.id");
+            default -> JpaSort.unsafe(direction, "p.created_at");
         };
     }
 }
