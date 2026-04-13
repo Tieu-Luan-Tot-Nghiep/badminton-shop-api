@@ -68,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/products/featured", "/api/products/new").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/cart/**", "/api/cart").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/admin", "/api/products/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*").permitAll()
                         .requestMatchers("/ws-chat/**").permitAll()
                         .anyRequest().authenticated()

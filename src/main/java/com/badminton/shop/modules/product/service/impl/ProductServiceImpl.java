@@ -25,6 +25,7 @@ import com.badminton.shop.modules.product.repository.CategoryRepository;
 import com.badminton.shop.modules.product.repository.ProductRepository;
 import com.badminton.shop.modules.product.repository.ProductVariantRepository;
 import com.badminton.shop.modules.product.repository.ProductWishlistRepository;
+import com.badminton.shop.modules.product.repository.projection.AdminProductListProjection;
 import com.badminton.shop.modules.review.dto.response.ReviewResponse;
 import com.badminton.shop.modules.review.entity.Review;
 import com.badminton.shop.modules.review.repository.ReviewRepository;
@@ -88,6 +89,19 @@ public class ProductServiceImpl implements ProductService {
                 category, brand, minPrice, maxPrice, keyword, pageable);
 
         return products.map(this::mapToListResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductListResponse> getAdminProducts(
+            String category, String brand,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            String keyword, Boolean isActive,
+            Boolean isDeleted, Pageable pageable) {
+
+        return productRepository.findAllAdminProducts(
+                        category, brand, minPrice, maxPrice, keyword, isActive, isDeleted, pageable)
+                .map(this::mapToAdminListResponse);
     }
 
     @Override
@@ -590,6 +604,24 @@ public class ProductServiceImpl implements ProductService {
                 .rate(resolveProductRate(product.getId()))
                 .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .isActive(product.getIsActive())
+                .isDeleted(product.getIsDeleted())
+                .build();
+    }
+
+    private ProductListResponse mapToAdminListResponse(AdminProductListProjection row) {
+        return ProductListResponse.builder()
+                .id(row.getId())
+                .name(row.getName())
+                .slug(row.getSlug())
+                .shortDescription(row.getShortDescription())
+                .thumbnailUrl(row.getThumbnailUrl())
+                .basePrice(row.getBasePrice())
+                .rate(resolveProductRate(row.getId()))
+                .brandName(row.getBrandName())
+                .categoryName(row.getCategoryName())
+                .isActive(row.getIsActive())
+                .isDeleted(row.getIsDeleted())
                 .build();
     }
 

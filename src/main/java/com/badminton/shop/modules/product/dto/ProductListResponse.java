@@ -22,4 +22,6 @@ public class ProductListResponse {
     private Double rate;
     private String brandName;
     private String categoryName;
+    private Boolean isActive;
+    private Boolean isDeleted;
 }

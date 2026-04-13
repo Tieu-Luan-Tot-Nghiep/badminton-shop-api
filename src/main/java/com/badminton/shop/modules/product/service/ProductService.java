@@ -24,6 +24,12 @@ public interface ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String keyword, Pageable pageable);
 
+        Page<ProductListResponse> getAdminProducts(
+            String category, String brand,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            String keyword, Boolean isActive,
+            Boolean isDeleted, Pageable pageable);
+
     boolean existsBySlug(String slug);
 
     ProductResponse getPublicProductById(Long id);

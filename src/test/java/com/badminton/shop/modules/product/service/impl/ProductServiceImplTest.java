@@ -10,6 +10,10 @@ import com.badminton.shop.modules.product.entity.ProductVariant;
 import com.badminton.shop.modules.product.repository.BrandRepository;
 import com.badminton.shop.modules.product.repository.CategoryRepository;
 import com.badminton.shop.modules.product.repository.ProductRepository;
+import com.badminton.shop.modules.product.repository.ProductVariantRepository;
+import com.badminton.shop.modules.product.repository.ProductWishlistRepository;
+import com.badminton.shop.modules.auth.repository.UserRepository;
+import com.badminton.shop.modules.review.repository.ReviewRepository;
 import com.badminton.shop.modules.search.event.ProductSearchSyncAction;
 import com.badminton.shop.modules.search.event.ProductSearchSyncEvent;
 import com.badminton.shop.utils.s3.S3Service;
@@ -48,6 +52,14 @@ class ProductServiceImplTest {
     private BrandRepository brandRepository;
     @Mock
     private CartItemRepository cartItemRepository;
+    @Mock
+    private ProductVariantRepository productVariantRepository;
+    @Mock
+    private ProductWishlistRepository productWishlistRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ReviewRepository reviewRepository;
     @Mock
     private S3Service s3Service;
     @Mock

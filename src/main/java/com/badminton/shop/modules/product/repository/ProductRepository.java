@@ -1,6 +1,7 @@
 package com.badminton.shop.modules.product.repository;
 
 import com.badminton.shop.modules.product.entity.Product;
+import com.badminton.shop.modules.product.repository.projection.AdminProductListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -100,4 +101,55 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                                 ORDER BY p.createdAt DESC, p.id DESC
                                                 """)
                 List<Product> findNewestProducts(Pageable pageable);
+
+                    @Query(
+                            value = """
+                                    SELECT
+                                        p.id AS id,
+                                        p.name AS name,
+                                        p.slug AS slug,
+                                        p.short_description AS shortDescription,
+                                        p.thumbnail_url AS thumbnailUrl,
+                                        p.base_price AS basePrice,
+                                        b.name AS brandName,
+                                        c.name AS categoryName,
+                                        p.is_active AS isActive,
+                                        p.is_deleted AS isDeleted
+                                    FROM products p
+                                    LEFT JOIN brands b ON p.brand_id = b.id
+                                    LEFT JOIN categories c ON p.category_id = c.id
+                                    WHERE (:categorySlug IS NULL OR c.slug = :categorySlug)
+                                      AND (:brandSlug IS NULL OR b.slug = :brandSlug)
+                                      AND (:minPrice IS NULL OR p.base_price >= :minPrice)
+                                      AND (:maxPrice IS NULL OR p.base_price <= :maxPrice)
+                                      AND (:keyword IS NULL OR LOWER(CAST(p.name AS text)) LIKE LOWER(CONCAT('%', CAST(:keyword AS text), '%')))
+                                      AND (:isActive IS NULL OR p.is_active = :isActive)
+                                      AND (:isDeleted IS NULL OR p.is_deleted = :isDeleted)
+                                    ORDER BY p.created_at DESC, p.id DESC
+                                    """,
+                            countQuery = """
+                                    SELECT COUNT(1)
+                                    FROM products p
+                                    LEFT JOIN brands b ON p.brand_id = b.id
+                                    LEFT JOIN categories c ON p.category_id = c.id
+                                    WHERE (:categorySlug IS NULL OR c.slug = :categorySlug)
+                                      AND (:brandSlug IS NULL OR b.slug = :brandSlug)
+                                      AND (:minPrice IS NULL OR p.base_price >= :minPrice)
+                                      AND (:maxPrice IS NULL OR p.base_price <= :maxPrice)
+                                      AND (:keyword IS NULL OR LOWER(CAST(p.name AS text)) LIKE LOWER(CONCAT('%', CAST(:keyword AS text), '%')))
+                                      AND (:isActive IS NULL OR p.is_active = :isActive)
+                                      AND (:isDeleted IS NULL OR p.is_deleted = :isDeleted)
+                                    """,
+                            nativeQuery = true
+                    )
+                    Page<AdminProductListProjection> findAllAdminProducts(
+                            @Param("categorySlug") String categorySlug,
+                            @Param("brandSlug") String brandSlug,
+                            @Param("minPrice") BigDecimal minPrice,
+                            @Param("maxPrice") BigDecimal maxPrice,
+                            @Param("keyword") String keyword,
+                            @Param("isActive") Boolean isActive,
+                            @Param("isDeleted") Boolean isDeleted,
+                            Pageable pageable
+                    );
 }

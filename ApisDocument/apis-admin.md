@@ -359,6 +359,16 @@ Field `PromotionResponse`:
 
 ## 8.1 Product admin routes
 
+- `GET /api/products/admin`
+  - Query:
+    - `category`, `brand`, `minPrice`, `maxPrice`, `keyword` (optional)
+    - `isActive` (optional, true/false)
+    - `isDeleted` (optional, true/false)
+    - `page`, `size`, `sortBy`, `sortDir`
+  - Response `data.content[]` bo sung:
+    - `isActive`: trang thai dang kinh doanh
+    - `isDeleted`: trang thai da xoa mem
+
 - `POST /api/products`
 - `PUT /api/products/{id}`
 - `POST /api/products/{id}/thumbnail` (multipart, field `file`)

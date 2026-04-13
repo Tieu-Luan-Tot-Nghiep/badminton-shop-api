@@ -136,6 +136,29 @@ public class ProductController {
 
     // ===== Admin APIs =====
 
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PagedResponse<ProductListResponse>>> getAdminProducts(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) Boolean isDeleted,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+
+        Sort sort = buildSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<ProductListResponse> products = productService.getAdminProducts(
+                category, brand, minPrice, maxPrice, keyword, isActive, isDeleted, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Admin products fetched successfully.", PagedResponse.from(products)));
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(@Valid @RequestBody ProductRequest request) {
