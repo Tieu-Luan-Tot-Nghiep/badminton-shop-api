@@ -287,11 +287,11 @@ public class ProductController {
         Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
 
         return switch (sortBy) {
-            case "price" -> JpaSort.unsafe(direction, "p.base_price");
-            case "name" -> JpaSort.unsafe(direction, "p.name");
-            case "updatedAt" -> JpaSort.unsafe(direction, "p.updated_at");
-            case "id" -> JpaSort.unsafe(direction, "p.id");
-            default -> JpaSort.unsafe(direction, "p.created_at");
+            case "price" -> JpaSort.unsafe(direction, "basePrice");
+            case "name" -> JpaSort.unsafe(direction, "name");
+            case "updatedAt" -> JpaSort.unsafe(direction, "updatedAt");
+            case "id" -> JpaSort.unsafe(direction, "id");
+            default -> JpaSort.unsafe(direction, "createdAt");
         };
     }
 }

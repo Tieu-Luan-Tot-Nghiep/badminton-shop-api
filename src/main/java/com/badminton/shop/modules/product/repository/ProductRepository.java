@@ -111,6 +111,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                         p.short_description AS shortDescription,
                                         p.thumbnail_url AS thumbnailUrl,
                                         p.base_price AS basePrice,
+                                                p.created_at AS createdAt,
+                                                p.updated_at AS updatedAt,
                                         b.name AS brandName,
                                         c.name AS categoryName,
                                         p.is_active AS isActive,
