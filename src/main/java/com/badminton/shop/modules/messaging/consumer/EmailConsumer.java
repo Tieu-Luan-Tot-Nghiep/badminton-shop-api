@@ -1,4 +1,4 @@
-package com.badminton.shop.modules.chat.consumer;
+package com.badminton.shop.modules.messaging.consumer;
 
 import com.badminton.shop.config.RabbitMQConfig;
 import com.badminton.shop.modules.messaging.dto.EmailMessage;

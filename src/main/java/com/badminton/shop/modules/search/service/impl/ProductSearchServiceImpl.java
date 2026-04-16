@@ -25,6 +25,7 @@ import com.badminton.shop.modules.search.repository.SearchQueryLogRepository;
 import com.badminton.shop.modules.search.service.ProductSearchService;
 import com.badminton.shop.modules.search.service.EmbeddingService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations;
@@ -50,6 +51,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class ProductSearchServiceImpl implements ProductSearchService {
 
     private final ProductSearchRepository productSearchRepository;
@@ -85,19 +87,73 @@ public class ProductSearchServiceImpl implements ProductSearchService {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(safePage, safeSize);
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        boolean semanticRequested = Boolean.TRUE.equals(useSemantic) && hasKeyword;
 
         Query query = buildQuery(keyword, category, brand, minPrice, maxPrice, activeOnly);
+        SearchHits<ProductSearchDocument> hits;
 
+        try {
+            hits = executeKeywordSearch(query, pageable, sortBy, sortDir, semanticRequested, keyword, true, true);
+        } catch (RuntimeException primaryEx) {
+            log.warn("[search] primary query failed; semanticRequested={}, keyword='{}', reason={}",
+                    semanticRequested, safeLogKeyword(keyword), extractRootCauseMessage(primaryEx));
+
+            if (semanticRequested) {
+                try {
+                    // Fallback 1: semantic fail -> lexical (disable KNN).
+                    hits = executeKeywordSearch(query, pageable, sortBy, sortDir, false, keyword, true, true);
+                    log.warn("[search] semantic fallback to lexical succeeded for keyword='{}'", safeLogKeyword(keyword));
+                } catch (RuntimeException lexicalEx) {
+                    log.warn("[search] lexical fallback failed for keyword='{}', reason={}",
+                            safeLogKeyword(keyword), extractRootCauseMessage(lexicalEx));
+                    try {
+                        // Fallback 2: degrade mode (no aggs, no explicit sort) to bypass mapping conflicts.
+                        hits = executeKeywordSearch(query, pageable, sortBy, sortDir, false, keyword, false, false);
+                        log.warn("[search] degraded fallback succeeded for keyword='{}'", safeLogKeyword(keyword));
+                    } catch (RuntimeException degradedEx) {
+                        throw buildSearchFailure(primaryEx, lexicalEx, degradedEx);
+                    }
+                }
+            } else {
+                try {
+                    // Lexical still fail -> degrade mode.
+                    hits = executeKeywordSearch(query, pageable, sortBy, sortDir, false, keyword, false, false);
+                    log.warn("[search] degraded fallback succeeded for keyword='{}'", safeLogKeyword(keyword));
+                } catch (RuntimeException degradedEx) {
+                    throw buildSearchFailure(primaryEx, null, degradedEx);
+                }
+            }
+        }
+
+        List<ProductSearchItemResponse> content = hits.getSearchHits().stream()
+                .map(SearchHit::getContent)
+                .map(this::toSearchItem)
+                .toList();
+
+        return toPageResponse(content, hits, safePage, safeSize);
+    }
+
+    private SearchHits<ProductSearchDocument> executeKeywordSearch(
+            Query query,
+            Pageable pageable,
+            String sortBy,
+            String sortDir,
+            boolean semanticEnabled,
+            String keyword,
+            boolean includeAggregations,
+            boolean includeSort
+    ) {
         NativeQueryBuilder queryBuilder = NativeQuery.builder()
                 .withQuery(query)
                 .withPageable(pageable);
 
-        addFacetAggregations(queryBuilder);
+        if (includeAggregations) {
+            addFacetAggregations(queryBuilder);
+        }
 
-        // Nếu keyword tồn tại và user muốn dùng semantic search (Hybrid Search)
-        if (Boolean.TRUE.equals(useSemantic) && keyword != null && !keyword.isBlank()) {
+        if (semanticEnabled) {
             float[] queryVector = embeddingService.embed(keyword);
-
             queryBuilder.withKnnSearches(k -> k
                     .field("my_vector")
                     .queryVector(toFloatList(queryVector))
@@ -106,22 +162,51 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             );
         }
 
-        for (SortOptions sortOption : buildSort(sortBy, sortDir)) {
-            queryBuilder.withSort(sortOption);
+        if (includeSort) {
+            for (SortOptions sortOption : buildSort(sortBy, sortDir)) {
+                queryBuilder.withSort(sortOption);
+            }
         }
 
-        SearchHits<ProductSearchDocument> hits = elasticsearchOperations.search(
+        return elasticsearchOperations.search(
                 queryBuilder.build(),
                 ProductSearchDocument.class,
                 IndexCoordinates.of(PRODUCT_INDEX)
         );
+    }
 
-        List<ProductSearchItemResponse> content = hits.getSearchHits().stream()
-                .map(SearchHit::getContent)
-                .map(this::toSearchItem)
-                .toList();
+    private IllegalStateException buildSearchFailure(RuntimeException primaryEx, RuntimeException secondaryEx, RuntimeException finalEx) {
+        String primaryMessage = extractRootCauseMessage(primaryEx);
+        String secondaryMessage = secondaryEx == null ? "N/A" : extractRootCauseMessage(secondaryEx);
+        String finalMessage = extractRootCauseMessage(finalEx);
 
-        return toPageResponse(content, hits, safePage, safeSize);
+        log.error("[search] failed after all fallbacks. primary='{}', secondary='{}', final='{}'",
+                primaryMessage, secondaryMessage, finalMessage, finalEx);
+
+        return new IllegalStateException(
+                "Search backend is unavailable or index mapping is incompatible. " +
+                        "Primary: " + primaryMessage + "; " +
+                        "Secondary: " + secondaryMessage + "; " +
+                        "Final: " + finalMessage,
+                finalEx
+        );
+    }
+
+    private String extractRootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        String message = current.getMessage();
+        return (message == null || message.isBlank()) ? current.getClass().getSimpleName() : message;
+    }
+
+    private String safeLogKeyword(String keyword) {
+        if (keyword == null) {
+            return "<null>";
+        }
+        String normalized = keyword.trim().replaceAll("\\s+", " ");
+        return normalized.length() > 100 ? normalized.substring(0, 100) + "..." : normalized;
     }
 
     @Override
