@@ -6,6 +6,7 @@ import com.badminton.shop.exception.InvalidCredentialsException;
 import com.badminton.shop.exception.UserAlreadyExistsException;
 import com.badminton.shop.exception.TooManyRequestsException;
 import com.badminton.shop.modules.auth.dto.*;
+import com.badminton.shop.modules.auth.entity.AuthProvider;
 import com.badminton.shop.modules.auth.entity.Role;
 import com.badminton.shop.modules.auth.entity.User;
 import com.badminton.shop.modules.auth.repository.UserRepository;
@@ -13,6 +14,9 @@ import com.badminton.shop.modules.auth.service.AuthService;
 import com.badminton.shop.modules.auth.service.RateLimitService;
 import com.badminton.shop.modules.messaging.dto.AvatarUpdateMessage;
 import com.badminton.shop.modules.messaging.dto.EmailMessage;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseToken;
 import com.badminton.shop.utils.jwt.JwtUtil;
 import com.badminton.shop.utils.s3.S3Service;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -46,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
     private final RabbitTemplate rabbitTemplate;
     private final RateLimitService rateLimitService;
     private final S3Service s3Service;
+    private final FirebaseAuth firebaseAuth;
 
     private static final String REDIS_VERIFY_PREFIX = "verify:";
     private static final String REDIS_REFRESH_TOKEN_PREFIX = "refresh:";
@@ -187,6 +193,43 @@ public class AuthServiceImpl implements AuthService {
         // Lưu Refresh Token vào Redis
         redisTemplate.opsForValue().set(REDIS_REFRESH_TOKEN_PREFIX + user.getEmail(), refreshToken, 7,
                 TimeUnit.DAYS);
+
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .username(user.getUsername())
+                .role(user.getRole().name())
+                .build();
+    }
+
+    @Override
+    public AuthResponse loginWithGoogle(GoogleLoginRequest request, String ipAddress) {
+        if (rateLimitService.isRateLimited(ipAddress, 10, 60)) {
+            throw new TooManyRequestsException("Bạn đã thử đăng nhập Google quá nhiều lần. Vui lòng thử lại sau 1 phút.");
+        }
+
+        FirebaseToken decodedToken;
+        try {
+            decodedToken = firebaseAuth.verifyIdToken(request.getIdToken().trim());
+        } catch (FirebaseAuthException | IllegalArgumentException ex) {
+            throw new InvalidCredentialsException("Google ID token không hợp lệ hoặc đã hết hạn.");
+        }
+
+        String tokenEmail = decodedToken.getEmail();
+        if (tokenEmail == null || tokenEmail.isBlank()) {
+            throw new InvalidCredentialsException("Không tìm thấy email hợp lệ trong Google ID token.");
+        }
+
+        String email = normalizeEmail(tokenEmail);
+        User user = userRepository.findByEmail(email)
+                .map(existingUser -> updateGoogleUser(existingUser, decodedToken))
+                .orElseGet(() -> createGoogleUser(decodedToken, email));
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        String token = jwtUtil.generateToken(userDetails);
+        String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+
+        redisTemplate.opsForValue().set(REDIS_REFRESH_TOKEN_PREFIX + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
 
         return AuthResponse.builder()
                 .token(token)
@@ -469,5 +512,74 @@ public class AuthServiceImpl implements AuthService {
             return "unknown";
         }
         return ipAddress.trim();
+    }
+
+    private User updateGoogleUser(User existingUser, FirebaseToken decodedToken) {
+        if (existingUser.getProvider() != null && existingUser.getProvider() != AuthProvider.GOOGLE) {
+            throw new InvalidCredentialsException(
+                    "Email này đã đăng ký bằng " + existingUser.getProvider() + ". Vui lòng đăng nhập theo phương thức đó.");
+        }
+
+        existingUser.setProvider(AuthProvider.GOOGLE);
+        existingUser.setProviderId(decodedToken.getUid());
+        existingUser.setIsEmailVerified(true);
+
+        Map<String, Object> claims = decodedToken.getClaims();
+        Object nameClaim = claims.get("name");
+        if (existingUser.getFullName() == null && nameClaim instanceof String name && !name.isBlank()) {
+            existingUser.setFullName(name);
+        }
+
+        Object pictureClaim = claims.get("picture");
+        if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank())
+                && pictureClaim instanceof String picture && !picture.isBlank()) {
+            existingUser.setAvatar(picture);
+        }
+
+        return userRepository.save(existingUser);
+    }
+
+    private User createGoogleUser(FirebaseToken decodedToken, String email) {
+        Map<String, Object> claims = decodedToken.getClaims();
+        Object nameClaim = claims.get("name");
+        Object pictureClaim = claims.get("picture");
+
+        User newUser = User.builder()
+                .username(resolveGoogleUsername(email))
+                .email(email)
+                .provider(AuthProvider.GOOGLE)
+                .providerId(decodedToken.getUid())
+                .fullName(nameClaim instanceof String name && !name.isBlank() ? name : null)
+                .avatar(pictureClaim instanceof String picture && !picture.isBlank() ? picture : null)
+                .role(Role.CUSTOMER)
+                .isActive(true)
+                .isEmailVerified(true)
+                .build();
+
+        return userRepository.save(newUser);
+    }
+
+    private String resolveGoogleUsername(String email) {
+        if (!userRepository.existsByUsername(email)) {
+            return email;
+        }
+
+        String localPart = email;
+        int atIndex = email.indexOf('@');
+        if (atIndex > 0) {
+            localPart = email.substring(0, atIndex);
+        }
+        localPart = localPart.replaceAll("[^a-zA-Z0-9._-]", "");
+        if (localPart.isBlank()) {
+            localPart = "google_user";
+        }
+
+        int suffix = 1;
+        String candidate = localPart + "_gg";
+        while (userRepository.existsByUsername(candidate)) {
+            candidate = localPart + "_gg" + suffix;
+            suffix++;
+        }
+        return candidate;
     }
 }

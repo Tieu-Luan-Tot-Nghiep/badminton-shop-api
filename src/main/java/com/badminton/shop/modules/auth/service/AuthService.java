@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 public interface AuthService {
     AuthResponse register(RegisterRequest request, String ipAddress);
     AuthResponse login(LoginRequest request, String ipAddress);
+    AuthResponse loginWithGoogle(GoogleLoginRequest request, String ipAddress);
     AuthResponse refreshToken(String refreshToken);
     void logout(String refreshToken);
     void verifyEmail(String token, String email);

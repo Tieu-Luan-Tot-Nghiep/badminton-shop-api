@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Firebase Admin ###
+*firebase-adminsdk*.json
+shuttlex-50e33-firebase-adminsdk-fbsvc-460e157abd.json

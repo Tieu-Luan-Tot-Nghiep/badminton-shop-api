@@ -93,6 +93,29 @@ class AuthControllerTest {
     }
 
     @Test
+    void googleLogin_ReturnsWrappedResponse() throws Exception {
+        AuthResponse authResponse = AuthResponse.builder()
+                .token("access-token")
+                .refreshToken("refresh-token")
+                .username("google-user")
+                .role("CUSTOMER")
+                .build();
+        when(authService.loginWithGoogle(any(), anyString())).thenReturn(authResponse);
+
+        mockMvc.perform(post("/api/auth/google/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "idToken": "firebase-id-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.token").value("access-token"));
+    }
+
+    @Test
     void refresh_ReturnsWrappedResponse() throws Exception {
         AuthResponse authResponse = AuthResponse.builder()
                 .token("new-access-token")

@@ -5,12 +5,16 @@ import com.badminton.shop.exception.InvalidCredentialsException;
 import com.badminton.shop.exception.TooManyRequestsException;
 import com.badminton.shop.exception.UserAlreadyExistsException;
 import com.badminton.shop.modules.auth.dto.*;
+import com.badminton.shop.modules.auth.entity.AuthProvider;
 import com.badminton.shop.modules.auth.entity.Role;
 import com.badminton.shop.modules.auth.entity.User;
 import com.badminton.shop.modules.auth.repository.UserRepository;
 import com.badminton.shop.modules.auth.service.RateLimitService;
 import com.badminton.shop.modules.messaging.dto.AvatarUpdateMessage;
 import com.badminton.shop.modules.messaging.dto.EmailMessage;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseToken;
 import com.badminton.shop.utils.jwt.JwtUtil;
 import com.badminton.shop.utils.s3.S3Service;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +65,8 @@ class AuthServiceTest {
     private RateLimitService rateLimitService;
     @Mock
     private S3Service s3Service;
+    @Mock
+    private FirebaseAuth firebaseAuth;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -68,6 +74,7 @@ class AuthServiceTest {
     private User testUser;
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
+    private GoogleLoginRequest googleLoginRequest;
 
     @BeforeEach
     void setUp() {
@@ -101,6 +108,10 @@ class AuthServiceTest {
                 .username("testuser")
                 .password("password123")
                 .build();
+
+        googleLoginRequest = GoogleLoginRequest.builder()
+            .idToken("firebase-id-token")
+            .build();
     }
 
     @Test
@@ -166,6 +177,40 @@ class AuthServiceTest {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
 
         assertThrows(EmailNotVerifiedException.class, () -> authService.login(loginRequest, "127.0.0.1"));
+    }
+
+    @Test
+    void loginWithGoogle_SuccessWithExistingUser() throws FirebaseAuthException {
+        FirebaseToken firebaseToken = mock(FirebaseToken.class);
+        when(rateLimitService.isRateLimited(anyString(), anyInt(), anyInt())).thenReturn(false);
+        when(firebaseAuth.verifyIdToken(anyString())).thenReturn(firebaseToken);
+        when(firebaseToken.getEmail()).thenReturn("test@example.com");
+        when(firebaseToken.getUid()).thenReturn("google-uid");
+        when(firebaseToken.getClaims()).thenReturn(java.util.Map.of("name", "Google User", "picture", "http://avatar"));
+        testUser.setProvider(AuthProvider.GOOGLE);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserDetails userDetails = mock(UserDetails.class);
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(userDetails);
+        when(jwtUtil.generateToken(any(UserDetails.class))).thenReturn("accessToken");
+        when(jwtUtil.generateRefreshToken(any(UserDetails.class))).thenReturn("refreshToken");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        AuthResponse response = authService.loginWithGoogle(googleLoginRequest, "127.0.0.1");
+
+        assertNotNull(response);
+        assertEquals("accessToken", response.getToken());
+        verify(firebaseAuth).verifyIdToken("firebase-id-token");
+    }
+
+    @Test
+    void loginWithGoogle_InvalidToken() throws FirebaseAuthException {
+        when(rateLimitService.isRateLimited(anyString(), anyInt(), anyInt())).thenReturn(false);
+        when(firebaseAuth.verifyIdToken(anyString())).thenThrow(mock(FirebaseAuthException.class));
+
+        assertThrows(InvalidCredentialsException.class,
+                () -> authService.loginWithGoogle(googleLoginRequest, "127.0.0.1"));
     }
 
     @Test

@@ -35,6 +35,14 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Login successful.", response));
     }
 
+    @PostMapping("/google/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(@Valid @RequestBody GoogleLoginRequest request,
+                                                                 HttpServletRequest servletRequest) {
+        String ipAddress = servletRequest.getRemoteAddr();
+        AuthResponse response = authService.loginWithGoogle(request, ipAddress);
+        return ResponseEntity.ok(ApiResponse.success("Google login successful.", response));
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refresh(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
