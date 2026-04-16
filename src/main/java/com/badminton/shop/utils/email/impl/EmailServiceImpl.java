@@ -15,7 +15,7 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.url:http://localhost:8080}")
+    @Value("${app.url:https://shuttlex.io.vn}")
     private String appUrl;
 
     @Override
