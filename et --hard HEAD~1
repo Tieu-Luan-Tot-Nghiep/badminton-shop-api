@@ -1,0 +1,280 @@
+[33mcommit d327a768a7f55db008ba59db30c6e2f9eedecc51[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 15:36:27 2026 +0700
+
+    add json
+
+[33mcommit 44ceab821c906789f249debb072fc11669e71811[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 15:23:54 2026 +0700
+
+    add json
+
+[33mcommit 28552da5c7c351b3ea93f102a9cb2e510c0a5f86[m[33m ([m[1;31morigin/main[m[33m)[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 15:15:12 2026 +0700
+
+    add login with GG
+
+[33mcommit ec134f128e99d792ff59fdea47f6832806568919[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 11:46:21 2026 +0700
+
+    fix dns for email verify
+
+[33mcommit 0f66e8a2b2660055255a0e506969aee2c953471c[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 11:22:47 2026 +0700
+
+    add postgresql for ec2
+
+[33mcommit 116c00827e1f0fd20b959708f0788533b672549c[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 10:48:44 2026 +0700
+
+    fix for search with ES by image
+
+[33mcommit 5b6239f0fab097d194d70d6c502810a6c15b1222[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Apr 16 10:39:33 2026 +0700
+
+    fix for search with ES
+
+[33mcommit 30e886b3518a827c62e4f28ed0088506c9edc810[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Apr 13 15:29:39 2026 +0700
+
+    add endpoint get list products for admin
+
+[33mcommit 0ef848c61bd231db1cbba954ea6ba4462ed1d6b6[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Apr 13 15:03:49 2026 +0700
+
+    add endpoint get list products for admin
+
+[33mcommit fa22ade61ee6e95941c1a1e82c9656b6221118ac[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Apr 13 14:52:46 2026 +0700
+
+    add endpoint get list products for admin
+
+[33mcommit 730d73b37e153139b8a1a83111d2d7f3112b5a61[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Apr 12 11:23:52 2026 +0700
+
+    fix module dashboard
+
+[33mcommit 1dd69dcf693d66047ca7f82873eb7571c48622ab[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Apr 11 16:32:48 2026 +0700
+
+    add module admin
+
+[33mcommit 64937be3f3e1728da377208c643e26ad996b6cbf[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Apr 11 16:25:13 2026 +0700
+
+    add module admin
+
+[33mcommit dfbb8ba1deac73500cb9002c45359430ed7a4513[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Apr 11 16:16:53 2026 +0700
+
+    add module admin
+
+[33mcommit 38ba9f7829e45cb124690e646a43e71fb881e4c9[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Apr 11 16:09:11 2026 +0700
+
+    add module admin
+
+[33mcommit 76806aab2757997dd7cb732c0838b4aeffcbbe73[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Apr 11 15:54:43 2026 +0700
+
+    add module admin
+
+[33mcommit 67a312512d0ab97f26e485573b6d2e956594345c[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Apr 5 23:16:56 2026 +0700
+
+    add waiting pedding
+
+[33mcommit 400e0eb7a157018a39d25032d0db8ba94e1899dc[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Tue Mar 31 14:52:23 2026 +0700
+
+    fix search with image service
+
+[33mcommit c47e2472845281340dd24a35d2bdf137c963cac7[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Tue Mar 31 14:44:21 2026 +0700
+
+    fix search with image service
+
+[33mcommit c19ad1d4c0fb43ccc4e5d0230e29d8b5ece4c59a[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 06:58:44 2026 +0700
+
+    docker compose
+
+[33mcommit fe69515f6439720b1a1e123fa2f0b0952ed53118[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 06:49:41 2026 +0700
+
+    docker compose
+
+[33mcommit 61dc707ff1dc30d2e0ad14f641fef52e08a4297e[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 06:21:35 2026 +0700
+
+    docker compose
+
+[33mcommit a02264b779893e8faa55c7d742a98f9d33ac7416[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 06:13:08 2026 +0700
+
+    docker compose
+
+[33mcommit 8aaaef88144a89d230eab02efc14434827053190[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 06:04:20 2026 +0700
+
+    docker compose
+
+[33mcommit 0df059bb7e1a25a23149d4ff0ee05cb66f8af8e0[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 05:58:21 2026 +0700
+
+    docker compose
+
+[33mcommit 23974695867dc782dc8dc2d0cf3a4d33fcffbd50[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Mon Mar 30 05:53:56 2026 +0700
+
+    docker compose
+
+[33mcommit 8f69feebecba8035dbdcfae52e979f1594779525[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 21:40:40 2026 +0700
+
+    fix jenkins file
+
+[33mcommit 719856b2cd4c544619efb8a57550aab064c3a076[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 21:37:47 2026 +0700
+
+    fix jenkins file
+
+[33mcommit b2e61806d0d8c8497c95539774b32e2bbf8a1e66[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 21:33:40 2026 +0700
+
+    fix jenkins file
+
+[33mcommit b1b930aa8904694d91b8ba16032e7cc3196d00e6[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 21:18:45 2026 +0700
+
+    fix jenkins file
+
+[33mcommit 0b7b927de3eb286ee1c1800f87593d107fc891ef[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 21:01:02 2026 +0700
+
+    fix jenkins file
+
+[33mcommit 7dc421831498969b11c672208ad187b850d2f084[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 20:22:24 2026 +0700
+
+    fix jenkins file
+
+[33mcommit 11e293600424a56adfe0f08c01f4530cc3541ed3[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 19:38:18 2026 +0700
+
+    fix jenkins file
+
+[33mcommit f96e8c195488e10523b40a167eb089478e9223b7[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sun Mar 29 19:02:02 2026 +0700
+
+    add run elasticsearch
+
+[33mcommit bb319a88c07ea7e7528f416415f3e95871a2dd3e[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 16:43:38 2026 +0700
+
+    fix
+
+[33mcommit 691c59ec85cd56a01cf1508850af9f3bc4ff105f[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 16:35:23 2026 +0700
+
+    fix jenkin
+
+[33mcommit 063a8d29a8f2f30eeae64a11135f94110d9352f8[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 15:39:04 2026 +0700
+
+    fix jenkinsfile
+
+[33mcommit 917b28e794a7cb0c36d69206717af546069157f4[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 15:32:43 2026 +0700
+
+    fix jenkinsfile
+
+[33mcommit 895a2aa8f62554e5330036ae08c93cde368d15b4[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 15:16:16 2026 +0700
+
+    fix jenkinsfile
+
+[33mcommit 21f9c83fbc8aba11e97d8758cf5f04d6d5f8caa9[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 15:03:31 2026 +0700
+
+    fix jenkinsfile
+
+[33mcommit e88e4b2ea8a401c58d9680a2b513e2fbda284809[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 14:24:47 2026 +0700
+
+    fix docker file and jenkinfile
+
+[33mcommit 0eb752c743696f5336737d486f2f52c6d13ba2d6[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 14:13:51 2026 +0700
+
+    fix docker file and jenkinfile
+
+[33mcommit 07bcf23c3bab6a38b720d5cbafc5804d152cf938[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 13:12:14 2026 +0700
+
+    add env
+
+[33mcommit 37b2b32fd6727bba588e22910f809d0db87c86b8[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 13:02:28 2026 +0700
+
+    add dockerfile and jenkinfile
+
+[33mcommit d3658103629311f8f895652e3f89a850b40015b3[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Mar 28 11:34:46 2026 +0700
+
+    add security config
+
+[33mcommit ea2e9fb6a1aad33ae051967f8ad87fa8c61691f0[m
+Author: Huynh Linh Hoai <22130084@st.hcmuaf.edu.vn>
+Date:   Thu Mar 26 13:17:19 2026 +0700
+
+    some file edit
+
+[33mcommit 6c1104fac7f29dda8548a586554d899187f732a3[m
+Merge: 43ff4f0 b43e53e
+Author: Huỳnh Linh Hoài <22130084@st.hcmuaf.edu.vn>
+Date:   Sat Ma
