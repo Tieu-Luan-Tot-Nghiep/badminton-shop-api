@@ -105,6 +105,24 @@ pipeline {
                             echo 'KHONG tim thay CLIP_MODEL_PATH trong file .env (se su dung gia tri rong khi run container)'
                         fi
 
+                        if grep -q '^POSTGRES_DB=' .env; then
+                            echo 'Bien POSTGRES_DB da ton tai trong file .env'
+                        else
+                            echo 'KHONG tim thay POSTGRES_DB trong file .env (se su dung gia tri mac dinh badminton_shop)'
+                        fi
+
+                        if grep -q '^POSTGRES_USER=' .env; then
+                            echo 'Bien POSTGRES_USER da ton tai trong file .env'
+                        else
+                            echo 'KHONG tim thay POSTGRES_USER trong file .env (se su dung gia tri mac dinh postgres)'
+                        fi
+
+                        if grep -q '^POSTGRES_PASSWORD=' .env; then
+                            echo 'Bien POSTGRES_PASSWORD da ton tai trong file .env'
+                        else
+                            echo 'KHONG tim thay POSTGRES_PASSWORD trong file .env (se su dung gia tri mac dinh postgres)'
+                        fi
+
                         rm -f .env
                     '''
                 }
@@ -164,6 +182,12 @@ pipeline {
                         export HOST_PORT="$HOST_PORT"
                         export CONTAINER_PORT="$CONTAINER_PORT"
                         export CONTAINER_NAME="$CONTAINER_NAME"
+                        export POSTGRES_DB="${POSTGRES_DB:-badminton_shop}"
+                        export POSTGRES_USER="${POSTGRES_USER:-postgres}"
+                        export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
+                        export DB_URL="${DB_URL:-jdbc:postgresql://postgres:5432/$POSTGRES_DB}"
+                        export DB_USERNAME="${DB_USERNAME:-$POSTGRES_USER}"
+                        export DB_PASSWORD="${DB_PASSWORD:-$POSTGRES_PASSWORD}"
                         # CLIP/Python service removed
 
                                                 # Remove old container if exists to avoid name conflict
@@ -172,6 +196,22 @@ pipeline {
                                                 fi
                                                 $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" pull app || true
                                                 $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
+
+                                                echo 'Waiting for postgres to become healthy...'
+                                                for i in $(seq 1 30); do
+                                                    DB_STATUS=$(docker inspect -f '{{.State.Health.Status}}' postgres 2>/dev/null || true)
+                                                    if [ "$DB_STATUS" = "healthy" ]; then
+                                                        echo 'PostgreSQL is healthy.'
+                                                        break
+                                                    fi
+                                                    if [ "$i" -eq 30 ]; then
+                                                        echo 'ERROR: PostgreSQL did not become healthy in time.'
+                                                        docker logs postgres || true
+                                                        exit 1
+                                                    fi
+                                                    sleep 2
+                                                done
+
                                                 $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" ps
 
                     '''
