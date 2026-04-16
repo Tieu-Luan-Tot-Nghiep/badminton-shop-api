@@ -275,7 +275,45 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             throw new IllegalArgumentException("Cannot generate valid image embedding from uploaded file");
         }
 
-        NativeQuery nativeQuery = NativeQuery.builder()
+        SearchHits<ProductSearchDocument> hits;
+        try {
+            hits = executeImageSearch(queryVector, pageable, activeOnly, true);
+        } catch (RuntimeException primaryEx) {
+            log.warn("[image-search] primary query failed; reason={}", extractRootCauseMessage(primaryEx));
+            try {
+            // Fallback: remove aggs in case index fields changed but vector query still works.
+            hits = executeImageSearch(queryVector, pageable, activeOnly, false);
+            log.warn("[image-search] fallback without aggs succeeded");
+            } catch (RuntimeException fallbackEx) {
+            String primaryMessage = extractRootCauseMessage(primaryEx);
+            String fallbackMessage = extractRootCauseMessage(fallbackEx);
+            log.error("[image-search] failed after fallback. primary='{}', fallback='{}'",
+                primaryMessage, fallbackMessage, fallbackEx);
+
+            throw new IllegalStateException(
+                "Image search backend is unavailable or image vector mapping is incompatible. " +
+                    "Primary: " + primaryMessage + "; " +
+                    "Fallback: " + fallbackMessage,
+                fallbackEx
+            );
+            }
+        }
+
+        List<ProductSearchItemResponse> content = hits.getSearchHits().stream()
+                .map(SearchHit::getContent)
+                .map(this::toSearchItem)
+                .toList();
+
+        return toPageResponse(content, hits, safePage, safeSize);
+    }
+
+    private SearchHits<ProductSearchDocument> executeImageSearch(
+            float[] queryVector,
+            Pageable pageable,
+            Boolean activeOnly,
+            boolean includeAggregations
+    ) {
+        NativeQueryBuilder queryBuilder = NativeQuery.builder()
                 .withQuery(q -> q.bool(b -> {
                     b.filter(f -> f.term(t -> t.field("isDeleted").value(false)));
                     if (activeOnly != null) {
@@ -289,24 +327,19 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                         .k(100)
                         .numCandidates(1000)
                 )
-                .withAggregation(AGG_BRANDS, buildBrandAggregation())
-                .withAggregation(AGG_CATEGORIES, buildCategoryAggregation())
-                .withAggregation(AGG_PRICE_RANGES, buildPriceRangeAggregation())
-                .withPageable(pageable)
-                .build();
+                .withPageable(pageable);
 
-        SearchHits<ProductSearchDocument> hits = elasticsearchOperations.search(
-                nativeQuery,
+        if (includeAggregations) {
+            queryBuilder.withAggregation(AGG_BRANDS, buildBrandAggregation())
+                    .withAggregation(AGG_CATEGORIES, buildCategoryAggregation())
+                    .withAggregation(AGG_PRICE_RANGES, buildPriceRangeAggregation());
+        }
+
+        return elasticsearchOperations.search(
+                queryBuilder.build(),
                 ProductSearchDocument.class,
                 IndexCoordinates.of(PRODUCT_INDEX)
         );
-
-        List<ProductSearchItemResponse> content = hits.getSearchHits().stream()
-                .map(SearchHit::getContent)
-                .map(this::toSearchItem)
-                .toList();
-
-        return toPageResponse(content, hits, safePage, safeSize);
     }
 
     @Override

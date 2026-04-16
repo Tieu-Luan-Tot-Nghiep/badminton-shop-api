@@ -94,6 +94,28 @@ if ($UseSemantic.IsPresent) {
 }
 "@
     Invoke-RestMethod -Method Post -Uri "$baseUri/$IndexName/_search" -Headers $headers -Body $knnBody | ConvertTo-Json -Depth 12
+
+    Write-Output "[Phase 1] KNN probe on clip_image_vector (image mapping check only)"
+    $clipVector = (1..512 | ForEach-Object { "0.001" }) -join ","
+    $clipKnnBody = @"
+{
+  "query": {
+    "bool": {
+      "filter": [
+        { "term": { "isDeleted": false } },
+        { "term": { "isActive": true } }
+      ]
+    }
+  },
+  "knn": {
+    "field": "clip_image_vector",
+    "query_vector": [$clipVector],
+    "k": 5,
+    "num_candidates": 50
+  }
+}
+"@
+    Invoke-RestMethod -Method Post -Uri "$baseUri/$IndexName/_search" -Headers $headers -Body $clipKnnBody | ConvertTo-Json -Depth 12
 }
 
 Write-Output "Phase 1 diagnostic completed. If any command fails, use returned root_cause to map field mismatch."
