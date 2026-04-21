@@ -10,6 +10,10 @@ services:
       DB_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/badminton_shop}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST:-redis-local}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-gQAAAAAAARpKAAIncDEwMmMwZGIzNjBlNTA0ZmViOTRhNTI0NjVlN2NkNDYzM3AxNzIyNjY}
+      REDIS_SSL_ENABLED: ${REDIS_SSL_ENABLED:-false}
       # Đường dẫn model CLIP cho DJL Java (khai báo trong .env hoặc trực tiếp ở đây)
       # app.search.clip.model-path=/home/ec2-user/models/clip-vit-base-patch32
       # RABBITMQ_ADDRESSES should be set in .env, e.g. amqp://user:pass@rabbitmq-local:5672
@@ -76,7 +80,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    command: ["sh", "-c", "redis-server --requirepass ${REDIS_CONTAINER_PASSWORD}"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-gQAAAAAAARpKAAIncDEwMmMwZGIzNjBlNTA0ZmViOTRhNTI0NjVlN2NkNDYzM3AxNzIyNjY}"]
     ports:
       - "6379:6379"
 
