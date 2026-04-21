@@ -37,6 +37,14 @@ public class CategoryController {
                 .body(ApiResponse.success(HttpStatus.CREATED, "Category created successfully.", categoryService.createCategory(request)));
     }
 
+    @PostMapping("/bulk")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> createCategories(
+            @Valid @RequestBody List<@Valid CategoryRequest> requests) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Categories created successfully.", categoryService.createCategories(requests)));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(

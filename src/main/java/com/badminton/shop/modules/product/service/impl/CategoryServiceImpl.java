@@ -16,7 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -78,6 +81,53 @@ public class CategoryServiceImpl implements CategoryService {
 
         Category saved = categoryRepository.save(category);
         return mapToResponse(saved);
+    }
+
+    @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_CATEGORY_TREE, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_CATEGORY_BY_SLUG, allEntries = true)
+    })
+    public List<CategoryResponse> createCategories(List<CategoryRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách danh mục không được để trống");
+        }
+
+        Set<String> requestLevelKeys = new HashSet<>();
+        List<Category> categories = requests.stream()
+                .map(request -> {
+                    Category parentCategory = null;
+                    if (request.getParentId() != null) {
+                        parentCategory = categoryRepository.findById(request.getParentId())
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                        "Không tìm thấy danh mục cha với id: " + request.getParentId()));
+                    }
+
+                    if (categoryRepository.existsByNameAndParentCategory(request.getName(), parentCategory)) {
+                        throw new DuplicateCategoryException(
+                                "Tên danh mục '" + request.getName() + "' đã tồn tại ở cùng cấp độ");
+                    }
+
+                    String requestLevelKey = request.getName().trim().toLowerCase()
+                            + "::"
+                            + Objects.toString(request.getParentId(), "root");
+                    if (!requestLevelKeys.add(requestLevelKey)) {
+                        throw new DuplicateCategoryException(
+                                "Danh sách có danh mục trùng tên ở cùng cấp độ: '" + request.getName() + "'");
+                    }
+
+                    return Category.builder()
+                            .name(request.getName())
+                            .slug(generateSlug(request.getName()))
+                            .description(request.getDescription())
+                            .parentCategory(parentCategory)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return categoryRepository.saveAll(categories).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
