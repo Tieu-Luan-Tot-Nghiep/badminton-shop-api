@@ -5,6 +5,7 @@ import com.badminton.shop.modules.search.event.ProductSearchSyncEvent;
 import com.badminton.shop.modules.search.service.ProductSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -16,6 +17,7 @@ public class ProductSearchSyncListener {
 
     private final ProductSearchService productSearchService;
 
+    @Async("searchSyncExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleProductSearchSync(ProductSearchSyncEvent event) {
         if (event.action() == ProductSearchSyncAction.DELETE) {
