@@ -115,6 +115,37 @@
   }
   ```
 
+### 3.3.1. Bulk Create Products
+- **URL**: `/api/products/bulk`
+- **Method**: `POST`
+- **Description**: Tạo nhiều sản phẩm trong một request.
+- **Authentication**: ADMIN.
+- **Request Body**: `List<ProductRequest>`.
+  ```json
+  [
+    {
+      "name": "Vot Yonex Arcsaber 11",
+      "shortDescription": "Kiem soat tot",
+      "description": "Mo ta chi tiet...",
+      "basePrice": 3200000,
+      "categoryId": 2,
+      "brandId": 1
+    },
+    {
+      "name": "Giay Victor A970",
+      "shortDescription": "On dinh co chan",
+      "description": "Mo ta chi tiet...",
+      "basePrice": 2400000,
+      "categoryId": 5,
+      "brandId": 3
+    }
+  ]
+  ```
+- **Validation**:
+  - Danh sach khong duoc rong.
+  - `categoryId`, `brandId` phai ton tai cho tung item.
+- **Success Response** (201 Created): `List<ProductResponse>`.
+
 ### 3.4. Update Product
 - **URL**: `/api/products/{id}`
 - **Method**: `PUT`
@@ -148,6 +179,51 @@
   }
   ```
 - **Success Response** (201 Created): newly created `ProductVariantResponse`.
+#### 3.5.2.1. Bulk Create Variants
+- **URL**: `/api/products/{productId}/variants/bulk`
+- **Method**: `POST`
+- **Authentication**: ADMIN.
+- **Description**: Tạo nhiều variant cho cùng một sản phẩm trong một request.
+- **Request Body**: `List<ProductVariantRequest>`.
+  ```json
+  [
+    {
+      "sku": "AS11-WH-4U-G5",
+      "weight": "4U",
+      "gripSize": "G5",
+      "stiffness": "Medium",
+      "balancePoint": "Even Balance",
+      "size": "Default",
+      "color": "White",
+      "price": 3290000,
+      "stock": 10,
+      "shippingWeightGrams": 95,
+      "shippingLengthCm": 68,
+      "shippingWidthCm": 24,
+      "shippingHeightCm": 5
+    },
+    {
+      "sku": "AS11-BK-4U-G5",
+      "weight": "4U",
+      "gripSize": "G5",
+      "stiffness": "Medium",
+      "balancePoint": "Even Balance",
+      "size": "Default",
+      "color": "Black",
+      "price": 3290000,
+      "stock": 8,
+      "shippingWeightGrams": 95,
+      "shippingLengthCm": 68,
+      "shippingWidthCm": 24,
+      "shippingHeightCm": 5
+    }
+  ]
+  ```
+- **Validation**:
+  - Danh sach khong duoc rong.
+  - Khong cho phep SKU trung trong cung request.
+  - Khong cho phep SKU trung voi SKU da co trong DB.
+- **Success Response** (201 Created): `List<ProductVariantResponse>`.
 #### 3.5.3. Update Variant
 - **URL**: `/api/products/{productId}/variants/{variantId}`
 - **Method**: `PUT`
@@ -179,6 +255,26 @@
   - `color` (String, required): tên màu (ví dụ "Trắng" hoặc "Đen").
   - `isMain` (Boolean, optional): đánh dấu ảnh đại diện cho màu đó (mặc định `false`).
 - **Success Response** (201 Created): `ProductImageResponse` với `imageUrl` khai báo đường dẫn S3.
+#### 3.6.2.1. Bulk Upload Product Images
+- **URL**: `/api/products/{productId}/images/bulk`
+- **Method**: `POST`
+- **Description**: Upload nhiều ảnh cho một sản phẩm trong một request multipart.
+- **Authentication**: ADMIN.
+- **Request**: `multipart/form-data` với 2 part:
+  - `metadata` (required): JSON array `List<ProductImageRequest>`.
+  - `files` (required): danh sách file ảnh theo đúng thứ tự `metadata`.
+- **Ví dụ metadata**:
+  ```json
+  [
+    { "color": "White", "isMain": true },
+    { "color": "Black", "isMain": false }
+  ]
+  ```
+- **Validation**:
+  - `metadata` khong duoc rong.
+  - `files` khong duoc rong.
+  - So phan tu `metadata` va `files` phai bang nhau.
+- **Success Response** (201 Created): `List<ProductImageResponse>`.
 #### 3.6.3. Update Product Image
 - **URL**: `/api/products/{productId}/images/{imageId}`
 - **Method**: `PUT`
@@ -220,6 +316,24 @@
 - **Description**: Xóa sản phẩm theo `id`.
 - **Authentication**: ADMIN.
 - **Success Response**: 204 No Content.
+
+### 3.10. Bulk Create Categories
+- **URL**: `/api/categories/bulk`
+- **Method**: `POST`
+- **Description**: Tạo nhiều category trong một request, hỗ trợ category cha (`parentId`) hoặc root (`parentId = null`).
+- **Authentication**: ADMIN.
+- **Request Body**: `List<CategoryRequest>`.
+  ```json
+  [
+    { "name": "Vot Cau Long", "description": "...", "parentId": null },
+    { "name": "Vot Chuyen Cong", "description": "...", "parentId": 1 }
+  ]
+  ```
+- **Validation**:
+  - Danh sach khong duoc rong.
+  - Neu co `parentId` thi parent phai ton tai.
+  - Khong cho phep trung ten category o cung cap do.
+- **Success Response** (201 Created): `List<CategoryResponse>`.
 
 ### 4.1. Reindex Products (Elasticsearch)
 - **URL**: `/api/search/products/reindex`

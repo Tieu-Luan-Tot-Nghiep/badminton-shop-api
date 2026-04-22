@@ -51,11 +51,15 @@ public interface ProductService {
     // Admin APIs
     ProductResponse createProduct(ProductRequest request);
 
+    List<ProductResponse> createProducts(List<ProductRequest> requests);
+
     ProductResponse updateProduct(Long id, ProductRequest request);
 
     List<ProductVariantResponse> getProductVariants(Long productId);
 
     ProductVariantResponse createProductVariant(Long productId, ProductVariantRequest request);
+
+    List<ProductVariantResponse> createProductVariants(Long productId, List<ProductVariantRequest> requests);
 
     ProductVariantResponse updateProductVariant(Long productId, Long variantId, ProductVariantRequest request);
 
@@ -64,6 +68,8 @@ public interface ProductService {
     List<ProductImageResponse> getProductImages(Long productId);
 
     ProductImageResponse uploadProductImage(Long productId, ProductImageRequest request, MultipartFile file);
+
+    List<ProductImageResponse> uploadProductImages(Long productId, List<ProductImageRequest> requests, List<MultipartFile> files);
 
     ProductImageResponse updateProductImage(Long productId, Long imageId, ProductImageRequest request);
 

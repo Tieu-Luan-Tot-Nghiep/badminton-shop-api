@@ -370,6 +370,7 @@ Field `PromotionResponse`:
     - `isDeleted`: trang thai da xoa mem
 
 - `POST /api/products`
+- `POST /api/products/bulk`
 - `PUT /api/products/{id}`
 - `POST /api/products/{id}/thumbnail` (multipart, field `file`)
 - `PATCH /api/products/{id}/status`
@@ -378,12 +379,14 @@ Field `PromotionResponse`:
 Variants:
 - `GET /api/products/{productId}/variants`
 - `POST /api/products/{productId}/variants`
+- `POST /api/products/{productId}/variants/bulk`
 - `PUT /api/products/{productId}/variants/{variantId}`
 - `DELETE /api/products/{productId}/variants/{variantId}`
 
 Images:
 - `GET /api/products/{productId}/images`
 - `POST /api/products/{productId}/images` (multipart, fields: `file`, `color`, `isMain`)
+- `POST /api/products/{productId}/images/bulk` (multipart, fields: `metadata` json array + `files`)
 - `PUT /api/products/{productId}/images/{imageId}`
 - `DELETE /api/products/{productId}/images/{imageId}`
 
@@ -436,6 +439,7 @@ Body `BrandRequest`:
 ## 8.3 Category admin routes
 
 - `POST /api/categories`
+- `POST /api/categories/bulk`
 - `PUT /api/categories/{id}`
 - `DELETE /api/categories/{id}`
 

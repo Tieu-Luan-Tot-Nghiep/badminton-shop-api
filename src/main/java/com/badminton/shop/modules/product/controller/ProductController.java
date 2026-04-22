@@ -167,6 +167,14 @@ public class ProductController {
                 .body(ApiResponse.success(HttpStatus.CREATED, "Product created successfully.", productService.createProduct(request)));
     }
 
+    @PostMapping("/bulk")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> createProducts(
+            @Valid @RequestBody List<@Valid ProductRequest> requests) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Products created successfully.", productService.createProducts(requests)));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
@@ -211,6 +219,15 @@ public class ProductController {
                 .body(ApiResponse.success(HttpStatus.CREATED, "Product variant created successfully.", productService.createProductVariant(productId, request)));
     }
 
+        @PostMapping("/{productId}/variants/bulk")
+        @PreAuthorize("hasRole('ADMIN')")
+        public ResponseEntity<ApiResponse<List<ProductVariantResponse>>> createProductVariants(
+            @PathVariable Long productId,
+            @Valid @RequestBody List<@Valid ProductVariantRequest> requests) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(HttpStatus.CREATED, "Product variants created successfully.", productService.createProductVariants(productId, requests)));
+        }
+
     @PutMapping("/{productId}/variants/{variantId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductVariantResponse>> updateProductVariant(
@@ -247,6 +264,16 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(HttpStatus.CREATED, "Product image uploaded successfully.", productService.uploadProductImage(productId, request, file)));
     }
+
+        @PostMapping(value = "/{productId}/images/bulk", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        @PreAuthorize("hasRole('ADMIN')")
+        public ResponseEntity<ApiResponse<List<ProductImageResponse>>> uploadProductImages(
+            @PathVariable Long productId,
+            @RequestPart("metadata") @Valid List<@Valid ProductImageRequest> requests,
+            @RequestPart("files") List<MultipartFile> files) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(HttpStatus.CREATED, "Product images uploaded successfully.", productService.uploadProductImages(productId, requests, files)));
+        }
 
     @PutMapping("/{productId}/images/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")

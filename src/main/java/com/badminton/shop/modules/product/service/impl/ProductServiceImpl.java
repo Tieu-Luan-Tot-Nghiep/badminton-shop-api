@@ -50,8 +50,10 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -270,6 +272,43 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+    })
+    public List<ProductResponse> createProducts(List<ProductRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách sản phẩm không được để trống");
+        }
+
+        List<Product> products = requests.stream().map(request -> {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy danh mục với id: " + request.getCategoryId()));
+
+            Brand brand = brandRepository.findById(request.getBrandId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy thương hiệu với id: " + request.getBrandId()));
+
+            String slug = generateUniqueSlug(request.getName());
+
+            return Product.builder()
+                    .name(request.getName())
+                    .slug(slug)
+                    .shortDescription(request.getShortDescription())
+                    .description(request.getDescription())
+                    .basePrice(request.getBasePrice())
+                    .category(category)
+                    .brand(brand)
+                    .build();
+        }).toList();
+
+        List<Product> savedProducts = productRepository.saveAll(products);
+        savedProducts.forEach(saved -> publishProductSearchSyncEvent(saved.getId(), ProductSearchSyncAction.UPSERT));
+        return savedProducts.stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
         @Caching(evict = {
             @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
             @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
@@ -337,6 +376,58 @@ public class ProductServiceImpl implements ProductService {
         product.addProductVariant(variant);
         productRepository.save(product);
         return mapToVariantResponse(variant);
+    }
+
+    @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+    })
+    public List<ProductVariantResponse> createProductVariants(Long productId, List<ProductVariantRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách biến thể sản phẩm không được để trống");
+        }
+
+        Product product = findProductOrThrow(productId);
+        Set<String> productExistingSkus = product.getVariants().stream()
+                .map(ProductVariant::getSku)
+                .map(sku -> sku == null ? "" : sku.trim().toLowerCase())
+                .collect(Collectors.toSet());
+        Set<String> requestSkus = new HashSet<>();
+        List<ProductVariant> createdVariants = new ArrayList<>();
+
+        for (ProductVariantRequest request : requests) {
+            String normalizedSku = request.getSku().trim().toLowerCase();
+            if (productExistingSkus.contains(normalizedSku) || !requestSkus.add(normalizedSku)) {
+                throw new IllegalArgumentException("SKU đã tồn tại trong sản phẩm: " + request.getSku());
+            }
+
+            if (productVariantRepository.existsBySku(request.getSku())) {
+                throw new IllegalArgumentException("SKU đã tồn tại: " + request.getSku());
+            }
+
+            ProductVariant variant = ProductVariant.builder()
+                    .sku(request.getSku())
+                    .weight(request.getWeight())
+                    .gripSize(request.getGripSize())
+                    .stiffness(request.getStiffness())
+                    .balancePoint(request.getBalancePoint())
+                    .size(request.getSize())
+                    .color(request.getColor())
+                    .price(request.getPrice())
+                    .originalPrice(request.getPrice())
+                    .stock(request.getStock())
+                    .shippingWeightGrams(request.getShippingWeightGrams())
+                    .shippingLengthCm(request.getShippingLengthCm())
+                    .shippingWidthCm(request.getShippingWidthCm())
+                    .shippingHeightCm(request.getShippingHeightCm())
+                    .build();
+            product.addProductVariant(variant);
+            createdVariants.add(variant);
+        }
+
+        productRepository.save(product);
+        return createdVariants.stream().map(this::mapToVariantResponse).toList();
     }
 
     @Override
@@ -521,6 +612,64 @@ public class ProductServiceImpl implements ProductService {
         product.addProductImage(image);
         productRepository.save(product);
         return mapToImageResponse(image);
+    }
+
+    @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CACHE_FEATURED, allEntries = true),
+            @CacheEvict(cacheNames = CACHE_NEWEST, allEntries = true)
+    })
+    public List<ProductImageResponse> uploadProductImages(Long productId, List<ProductImageRequest> requests, List<MultipartFile> files) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách metadata ảnh không được để trống");
+        }
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách file ảnh không được để trống");
+        }
+        if (requests.size() != files.size()) {
+            throw new IllegalArgumentException("Số lượng metadata và file ảnh phải bằng nhau");
+        }
+
+        Product product = findProductOrThrow(productId);
+        List<String> uploadedUrls = new ArrayList<>();
+        List<ProductImage> createdImages = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < files.size(); i++) {
+                ProductImageRequest request = requests.get(i);
+                MultipartFile file = files.get(i);
+
+                if (file == null || file.isEmpty()) {
+                    throw new IllegalArgumentException("File ảnh tại vị trí " + i + " không hợp lệ");
+                }
+
+                String sanitizedColor = request.getColor().trim().toLowerCase().replaceAll("[^a-z0-9]+", "-");
+                if (sanitizedColor.isBlank()) {
+                    sanitizedColor = "image";
+                }
+
+                String fileName = String.format("%s/%s-%s", product.getSlug(), sanitizedColor, UUID.randomUUID());
+                String imageUrl = s3Service.uploadFile("products", fileName, file);
+                uploadedUrls.add(imageUrl);
+
+                ProductImage image = ProductImage.builder()
+                        .imageUrl(imageUrl)
+                        .color(request.getColor())
+                        .isMain(Boolean.TRUE.equals(request.getIsMain()))
+                        .build();
+
+                product.addProductImage(image);
+                createdImages.add(image);
+            }
+
+            productRepository.save(product);
+            return createdImages.stream().map(this::mapToImageResponse).toList();
+        } catch (Exception ex) {
+            for (String url : uploadedUrls) {
+                deleteFileIfExists(url);
+            }
+            throw ex;
+        }
     }
 
     @Override
