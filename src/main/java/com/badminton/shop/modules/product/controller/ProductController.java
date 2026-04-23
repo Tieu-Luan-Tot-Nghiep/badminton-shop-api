@@ -61,6 +61,26 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Products fetched successfully.", PagedResponse.from(products)));
         }
 
+    @GetMapping("/categories/{categoryId}")
+    public ResponseEntity<ApiResponse<PagedResponse<ProductListResponse>>> getProductsByCategoryId(
+            @PathVariable Long categoryId,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+
+        Sort sort = buildSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<ProductListResponse> products = productService.getPublicProductsByCategoryId(
+                categoryId, brand, minPrice, maxPrice, keyword, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Products fetched successfully.", PagedResponse.from(products)));
+    }
+
     @GetMapping("/search/existsBySlug")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> checkSlug(@RequestParam String slug) {
         boolean exists = productService.existsBySlug(slug);

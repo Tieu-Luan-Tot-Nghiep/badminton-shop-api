@@ -24,6 +24,14 @@ public interface ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String keyword, Pageable pageable);
 
+    Page<ProductListResponse> getPublicProductsByCategoryId(
+            Long categoryId,
+            String brand,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String keyword,
+            Pageable pageable);
+
         Page<ProductListResponse> getAdminProducts(
             String category, String brand,
             BigDecimal minPrice, BigDecimal maxPrice,

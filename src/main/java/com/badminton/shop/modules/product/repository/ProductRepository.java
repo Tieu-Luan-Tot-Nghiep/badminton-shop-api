@@ -64,6 +64,28 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             Pageable pageable
     );
 
+    @Query("""
+            SELECT p FROM Product p
+            JOIN p.category c
+            JOIN p.brand b
+            WHERE p.isActive = true
+              AND c.isDeleted = false
+              AND b.isDeleted = false
+              AND c.id IN :categoryIds
+              AND (:brandSlug IS NULL OR b.slug = :brandSlug)
+              AND (:minPrice IS NULL OR p.basePrice >= :minPrice)
+              AND (:maxPrice IS NULL OR p.basePrice <= :maxPrice)
+              AND (:keyword IS NULL OR LOWER(CAST(p.name AS text)) LIKE LOWER(CONCAT('%', CAST(:keyword AS text), '%')))
+            """)
+    Page<Product> findAllPublicProductsByCategoryIds(
+            @Param("categoryIds") List<Long> categoryIds,
+            @Param("brandSlug") String brandSlug,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
     /**
      * Lấy chi tiết sản phẩm public theo slug (kiểm tra active + brand/category chưa bị xóa)
      */

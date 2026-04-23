@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -19,7 +20,6 @@ import java.util.Map;
 public class GeminiClientServiceImpl implements GeminiClientService {
 
     private static final String FIXED_API_VERSION = "v1beta";
-    private static final String FIXED_MODEL = "gemini-2.5-flash";
     private static final int DEFAULT_MAX_OUTPUT_TOKENS = 1024;
     private static final int CONTINUATION_MAX_OUTPUT_TOKENS = 1536;
     private static final int MIN_REASONABLE_ANSWER_LENGTH = 220;
@@ -30,8 +30,24 @@ public class GeminiClientServiceImpl implements GeminiClientService {
     @Value("${GEMINI_TOKEN:}")
     private String geminiToken;
 
-    public GeminiClientServiceImpl(@Value("${app.chatbot.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+    @Value("${app.chatbot.gemini.model:gemini-2.0-flash}")
+    private String geminiModel;
+
+    @Value("${app.chatbot.gemini.enable-continuation:false}")
+    private boolean continuationEnabled;
+
+    public GeminiClientServiceImpl(
+            @Value("${app.chatbot.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
+            @Value("${app.chatbot.gemini.connect-timeout-ms:3000}") int connectTimeoutMs,
+            @Value("${app.chatbot.gemini.read-timeout-ms:12000}") int readTimeoutMs) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
+
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .build();
     }
 
     @Override
@@ -47,7 +63,7 @@ public class GeminiClientServiceImpl implements GeminiClientService {
                 throw new IllegalStateException("Gemini response blocked by safety filters.");
             }
 
-            if (shouldRetryAsContinuation(initialResult)) {
+            if (continuationEnabled && shouldRetryAsContinuation(initialResult)) {
                 String continuationPrompt = buildContinuationPrompt(prompt, answer);
                 GeminiParseResult continuationResult = callGemini(continuationPrompt, CONTINUATION_MAX_OUTPUT_TOKENS);
                 if (isSafetyStopped(continuationResult.finishReasons())) {
@@ -59,7 +75,7 @@ public class GeminiClientServiceImpl implements GeminiClientService {
                 }
             }
 
-            log.info("Gemini selected model={} apiVersion={}", FIXED_MODEL, FIXED_API_VERSION);
+            log.info("Gemini selected model={} apiVersion={}", geminiModel, FIXED_API_VERSION);
             return answer;
         } catch (RestClientResponseException ex) {
             throw new IllegalStateException("Gemini call failed: " + ex.getResponseBodyAsString(), ex);
@@ -85,7 +101,7 @@ public class GeminiClientServiceImpl implements GeminiClientService {
                 .uri(uriBuilder -> uriBuilder
                         .path("/{apiVersion}/models/{model}:generateContent")
                         .queryParam("key", geminiToken)
-                        .build(FIXED_API_VERSION, FIXED_MODEL))
+                    .build(FIXED_API_VERSION, geminiModel))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
                 .retrieve()

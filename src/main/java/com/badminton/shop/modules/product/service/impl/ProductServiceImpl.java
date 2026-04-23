@@ -50,6 +50,7 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +90,28 @@ public class ProductServiceImpl implements ProductService {
 
         Page<Product> products = productRepository.findAllPublicProducts(
                 category, brand, minPrice, maxPrice, keyword, pageable);
+
+        return products.map(this::mapToListResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductListResponse> getPublicProductsByCategoryId(
+            Long categoryId,
+            String brand,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String keyword,
+            Pageable pageable) {
+
+        Category rootCategory = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với id: " + categoryId));
+
+        Set<Long> categoryIds = new LinkedHashSet<>();
+        collectCategoryAndDescendantIds(rootCategory, categoryIds);
+
+        Page<Product> products = productRepository.findAllPublicProductsByCategoryIds(
+                new ArrayList<>(categoryIds), brand, minPrice, maxPrice, keyword, pageable);
 
         return products.map(this::mapToListResponse);
     }
@@ -876,5 +899,17 @@ public class ProductServiceImpl implements ProductService {
 
     private int normalizeLimit(int limit) {
         return Math.min(Math.max(limit, 1), 50);
+    }
+
+    private void collectCategoryAndDescendantIds(Category category, Set<Long> collector) {
+        if (category == null || category.getId() == null || !collector.add(category.getId())) {
+            return;
+        }
+        if (category.getSubCategories() == null || category.getSubCategories().isEmpty()) {
+            return;
+        }
+        for (Category child : category.getSubCategories()) {
+            collectCategoryAndDescendantIds(child, collector);
+        }
     }
 }

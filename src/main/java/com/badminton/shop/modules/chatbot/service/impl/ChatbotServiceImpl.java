@@ -193,6 +193,10 @@ public class ChatbotServiceImpl implements ChatbotService {
     }
 
     private List<ProductSearchItemResponse> retrieveCandidateProducts(String retrievalQuery, String rawQuestion) {
+        if (!isLikelyProductIntent(rawQuestion)) {
+            return List.of();
+        }
+
         Long budget = extractBudgetVnd(rawQuestion);
         BigDecimal minPrice = null;
         BigDecimal maxPrice = null;
@@ -203,7 +207,28 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         try {
-            ProductSearchPageResponse page = productSearchService.searchProducts(
+            ProductSearchPageResponse lexicalPage = productSearchService.searchProducts(
+                    retrievalQuery,
+                    null,
+                    null,
+                    minPrice,
+                    maxPrice,
+                    "createdAt",
+                    "desc",
+                    0,
+                    3,
+                    true,
+                    false
+            );
+
+            List<ProductSearchItemResponse> lexicalItems = lexicalPage.getContent() == null
+                    ? List.of()
+                    : lexicalPage.getContent();
+            if (!lexicalItems.isEmpty()) {
+                return lexicalItems;
+            }
+
+            ProductSearchPageResponse semanticPage = productSearchService.searchProducts(
                     retrievalQuery,
                     null,
                     null,
@@ -216,11 +241,35 @@ public class ChatbotServiceImpl implements ChatbotService {
                     true,
                     true
             );
-            return page.getContent() == null ? List.of() : page.getContent();
+            return semanticPage.getContent() == null ? List.of() : semanticPage.getContent();
         } catch (Exception ex) {
             log.warn("Product retrieval failed for query: {}", retrievalQuery, ex);
             return List.of();
         }
+    }
+
+    private boolean isLikelyProductIntent(String rawQuestion) {
+        if (rawQuestion == null || rawQuestion.isBlank()) {
+            return false;
+        }
+
+        String normalized = normalize(rawQuestion);
+        if (extractBudgetVnd(normalized) != null) {
+            return true;
+        }
+
+        return normalized.contains("vot")
+                || normalized.contains("giay")
+                || normalized.contains("ao")
+                || normalized.contains("quan")
+                || normalized.contains("yonex")
+                || normalized.contains("lining")
+                || normalized.contains("victor")
+                || normalized.contains("gia")
+                || normalized.contains("goi y")
+                || normalized.contains("tu van")
+                || normalized.contains("chon")
+                || normalized.contains("san pham");
     }
 
     private String buildRetrievalQuery(String question, String recalledMemory) {
