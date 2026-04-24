@@ -19,6 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/search/products")
@@ -56,11 +58,27 @@ public class ProductSearchController {
     @PostMapping("/reindex")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, String>>> reindexProducts() {
-        productSearchService.reindexAllProducts();
-        return ResponseEntity.ok(ApiResponse.success(
-                "Product index reindex completed",
-                Map.of("result", "ok")
-        ));
+        try {
+            CompletableFuture<Void> reindexFuture = productSearchService.reindexAllProducts();
+            
+            // Wait for completion with 10-minute timeout
+            reindexFuture.get(10, TimeUnit.MINUTES);
+            
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Product index reindex completed successfully",
+                    Map.of("result", "completed", "status", "success")
+            ));
+        } catch (java.util.concurrent.TimeoutException e) {
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Product reindex is taking longer than expected but continues in background",
+                    Map.of("result", "timeout", "status", "processing", "message", "Reindex operation timed out after 10 minutes but may still be running in background")
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Product reindex failed: " + e.getMessage(),
+                    Map.of("result", "error", "status", "failed", "error", e.getMessage())
+            ));
+        }
     }
 
     @PostMapping(value = "/by-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

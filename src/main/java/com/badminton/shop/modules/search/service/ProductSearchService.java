@@ -6,6 +6,7 @@ import com.badminton.shop.modules.search.dto.ProductSearchTrendingResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.concurrent.CompletableFuture;
 
 public interface ProductSearchService {
 
@@ -37,5 +38,5 @@ public interface ProductSearchService {
 
     void deleteProduct(Long productId);
 
-    void reindexAllProducts();
+    CompletableFuture<Void> reindexAllProducts();
 }

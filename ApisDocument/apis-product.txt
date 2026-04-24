@@ -1,10 +1,10 @@
 ### 2.0. Search Products (Elasticsearch)
 - **URL**: `/api/search/products`
 - **Method**: `GET`
-- **Description**: Tìm kiếm sản phẩm qua chỉ mục Elasticsearch (full-text + filter + sort + phân trang).
+- **Description**: Tìm kiếm sản phẩm qua chỉ mục Elasticsearch (full-text + filter + sort + phân trang). **Tên sản phẩm được ưu tiên cao nhất** trong kết quả tìm kiếm (boost x10).
 - **Authentication**: Không yêu cầu.
 - **Query Parameters**:
-  - `keyword` (String, optional) — tìm theo tên/mô tả/brand/category (fuzzy search).
+  - `keyword` (String, optional) — tìm theo tên/mô tả/brand/category (fuzzy search). Tên sản phẩm có độ ưu tiên cao nhất.
   - `category` (String, slug, optional) — lọc theo danh mục.
   - `brand` (String, slug, optional) — lọc theo thương hiệu.
   - `minPrice`/`maxPrice` (Number, optional) — lọc khoảng giá.
@@ -14,6 +14,7 @@
   - `sortDir` (`asc`/`desc`; default `desc`).
   - `page` (int, default `0`).
   - `size` (int, default `12`, max `100`).
+- **Search Priority**: Tên sản phẩm (boost x10) > Mô tả ngắn (boost x2) > Mô tả > Tên thương hiệu > Tên danh mục.
 - **Success Response** (200 OK): `ProductSearchPageResponse`.
 
 ### 2.0.1. Search Products By Image
@@ -364,12 +365,39 @@
 ### 4.1. Reindex Products (Elasticsearch)
 - **URL**: `/api/search/products/reindex`
 - **Method**: `POST`
-- **Description**: Đồng bộ lại toàn bộ products từ database vào Elasticsearch index.
+- **Description**: Đồng bộ lại toàn bộ products từ database vào Elasticsearch index. Có timeout 10 phút.
 - **Authentication**: ADMIN.
+- **Timeout**: 10 minutes
 - **Success Response** (200 OK):
   ```json
   {
-    "message": "Product index reindex completed"
+    "message": "Product index reindex completed successfully",
+    "data": {
+      "result": "completed",
+      "status": "success"
+    }
+  }
+  ```
+- **Timeout Response** (200 OK):
+  ```json
+  {
+    "message": "Product reindex is taking longer than expected but continues in background",
+    "data": {
+      "result": "timeout",
+      "status": "processing",
+      "message": "Reindex operation timed out after 10 minutes but may still be running in background"
+    }
+  }
+  ```
+- **Error Response** (200 OK):
+  ```json
+  {
+    "message": "Product reindex failed: [error message]",
+    "data": {
+      "result": "error",
+      "status": "failed",
+      "error": "[error details]"
+    }
   }
   ```
 

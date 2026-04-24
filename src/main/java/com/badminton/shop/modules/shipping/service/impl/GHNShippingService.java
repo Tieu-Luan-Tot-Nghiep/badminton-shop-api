@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -31,10 +32,15 @@ import java.util.Map;
 public class GHNShippingService implements ShippingProvider {
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
+    private static final String CACHE_KEY_PROVINCES = "ghn:provinces";
+    private static final String CACHE_KEY_DISTRICTS_PREFIX = "ghn:districts:";
+    private static final String CACHE_KEY_WARDS_PREFIX = "ghn:wards:";
+    private static final Duration CACHE_TTL = Duration.ofDays(7); // Master data ít thay đổi
 
     @Qualifier("ghnWebClient")
     private final WebClient webClient;
     private final GHNProperties ghnProperties;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Override
     public BigDecimal calculateShippingFee(GHNShippingFeeRequest request) {
@@ -63,6 +69,15 @@ public class GHNShippingService implements ShippingProvider {
 
     @Override
     public List<ProvinceResponse> getProvinces() {
+        // Try cache first
+        Object cached = redisTemplate.opsForValue().get(CACHE_KEY_PROVINCES);
+        if (cached instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof ProvinceResponse) {
+            @SuppressWarnings("unchecked")
+            List<ProvinceResponse> cachedProvinces = (List<ProvinceResponse>) cached;
+            return cachedProvinces;
+        }
+
+        // Fetch from GHN
         JsonNode data = getForData("/master-data/province");
         List<ProvinceResponse> provinces = new ArrayList<>();
         for (JsonNode item : data) {
@@ -76,11 +91,27 @@ public class GHNShippingService implements ShippingProvider {
                     .provinceName(provinceName)
                     .build());
         }
+
+        // Cache result
+        if (!provinces.isEmpty()) {
+            redisTemplate.opsForValue().set(CACHE_KEY_PROVINCES, provinces, CACHE_TTL);
+        }
         return provinces;
     }
 
     @Override
     public List<DistrictResponse> getDistricts(Integer provinceId) {
+        String cacheKey = CACHE_KEY_DISTRICTS_PREFIX + provinceId;
+
+        // Try cache first
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof DistrictResponse) {
+            @SuppressWarnings("unchecked")
+            List<DistrictResponse> cachedDistricts = (List<DistrictResponse>) cached;
+            return cachedDistricts;
+        }
+
+        // Fetch from GHN
         JsonNode data = postForData("/master-data/district", Map.of("province_id", provinceId));
         List<DistrictResponse> districts = new ArrayList<>();
         for (JsonNode item : data) {
@@ -96,11 +127,27 @@ public class GHNShippingService implements ShippingProvider {
                     .provinceId(districtProvinceId)
                     .build());
         }
+
+        // Cache result
+        if (!districts.isEmpty()) {
+            redisTemplate.opsForValue().set(cacheKey, districts, CACHE_TTL);
+        }
         return districts;
     }
 
     @Override
     public List<WardResponse> getWards(Integer districtId) {
+        String cacheKey = CACHE_KEY_WARDS_PREFIX + districtId;
+
+        // Try cache first
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof WardResponse) {
+            @SuppressWarnings("unchecked")
+            List<WardResponse> cachedWards = (List<WardResponse>) cached;
+            return cachedWards;
+        }
+
+        // Fetch from GHN
         JsonNode data = postForData("/master-data/ward", Map.of("district_id", districtId));
         List<WardResponse> wards = new ArrayList<>();
         for (JsonNode item : data) {
@@ -114,6 +161,11 @@ public class GHNShippingService implements ShippingProvider {
                     .wardName(wardName)
                     .districtId(districtId)
                     .build());
+        }
+
+        // Cache result
+        if (!wards.isEmpty()) {
+            redisTemplate.opsForValue().set(cacheKey, wards, CACHE_TTL);
         }
         return wards;
     }

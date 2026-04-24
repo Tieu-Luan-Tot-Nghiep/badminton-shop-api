@@ -38,6 +38,7 @@ import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.scheduling.annotation.Async;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -47,6 +48,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -410,7 +412,7 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                 .withQuery(q -> q.bool(b -> b
                         .filter(f -> f.term(t -> t.field("isDeleted").value(false)))
                         .filter(f -> f.term(t -> t.field("isActive").value(true)))
-                        .should(s -> s.matchPhrasePrefix(m -> m.field("name").query(normalizedQuery)))
+                        .should(s -> s.matchPhrasePrefix(m -> m.field("name").query(normalizedQuery).boost(10.0f)))
                 .should(s -> s.prefix(p -> p.field("brandName").value(normalizedQuery).caseInsensitive(true)))
                 .should(s -> s.prefix(p -> p.field("categoryName").value(normalizedQuery).caseInsensitive(true)))
                         .minimumShouldMatch("1")
@@ -487,11 +489,17 @@ public class ProductSearchServiceImpl implements ProductSearchService {
     }
 
     @Override
-    public void reindexAllProducts() {
-        List<ProductSearchDocument> documents = productRepository.findAllForSearchSync().stream()
-                .map(this::toSearchDocument)
-                .toList();
-        productSearchRepository.saveAll(documents);
+    @Async("searchSyncExecutor")
+    public CompletableFuture<Void> reindexAllProducts() {
+        try {
+            List<ProductSearchDocument> documents = productRepository.findAllForSearchSync().stream()
+                    .map(this::toSearchDocument)
+                    .toList();
+            productSearchRepository.saveAll(documents);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     private Query buildQuery(
@@ -516,7 +524,7 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             if (hasKeyword) {
                 b.must(m -> m.multiMatch(mm -> mm
                         .query(keyword)
-                        .fields("name^3", "shortDescription^2", "description", "brandName", "categoryName")
+                        .fields("name^10", "shortDescription^2", "description", "brandName", "categoryName")
                         .fuzziness("AUTO")
                 ));
             }
@@ -558,8 +566,12 @@ public class ProductSearchServiceImpl implements ProductSearchService {
     }
 
     private ProductSearchDocument toSearchDocument(Product product) {
-        String combinedText = String.format("%s %s %s %s %s",
-                product.getName(),
+        // Prioritize product name by repeating it multiple times for semantic search
+        String productName = product.getName() != null ? product.getName() : "";
+        String combinedText = String.format("%s %s %s %s %s %s %s",
+                productName, // First occurrence
+                productName, // Second occurrence for higher weight
+                productName, // Third occurrence for even higher weight
                 product.getBrand() != null ? product.getBrand().getName() : "",
                 product.getCategory() != null ? product.getCategory().getName() : "",
                 product.getShortDescription() != null ? product.getShortDescription() : "",
