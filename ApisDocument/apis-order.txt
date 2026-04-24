@@ -48,6 +48,8 @@
 - Authentication: Bắt buộc (Bearer token).
 - Success Response (200 OK): CartResponse (items rỗng).
 
+Note: GET /api/cart hiện được cấu hình permitAll trong SecurityConfig (guest cart). Tuy nhiên CartController dùng Principal nên thực tế vẫn cần đăng nhập để hoạt động đúng.
+
 
 ### 2. Order APIs
 

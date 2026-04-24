@@ -7,10 +7,13 @@ import com.badminton.shop.modules.promotion.dto.response.PromotionValidationResp
 import org.springframework.data.domain.Page;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public interface PromotionService {
 
     PromotionResponse createPromotion(PromotionRequest request);
+
+    List<PromotionResponse> createPromotions(List<PromotionRequest> requests);
 
     PromotionResponse updatePromotion(Long id, PromotionRequest request);
 

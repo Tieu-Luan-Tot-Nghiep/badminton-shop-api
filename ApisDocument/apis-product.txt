@@ -9,33 +9,45 @@
   - `brand` (String, slug, optional) — lọc theo thương hiệu.
   - `minPrice`/`maxPrice` (Number, optional) — lọc khoảng giá.
   - `activeOnly` (Boolean, default `true`) — chỉ lấy sản phẩm đang active.
+  - `useSemantic` (Boolean, default `false`) — bật semantic search.
   - `sortBy` (`createdAt`, `price`, `name`; default `createdAt`).
   - `sortDir` (`asc`/`desc`; default `desc`).
   - `page` (int, default `0`).
   - `size` (int, default `12`, max `100`).
 - **Success Response** (200 OK): `ProductSearchPageResponse`.
-  ```json
-  {
-    "content": [
-      {
-        "id": 100,
-        "name": "Vợt Yonex NanoFlare",
-        "slug": "yonex-nanoflare",
-        "shortDescription": "Vợt cầu lông nhẹ",
-        "thumbnailUrl": "https://cdn.example.com/vot.png",
-        "basePrice": 3500000,
-        "brandName": "Yonex",
-        "categoryName": "Vợt",
-        "isActive": true
-      }
-    ],
-    "page": 0,
-    "size": 12,
-    "totalElements": 45,
-    "totalPages": 4,
-    "last": false
-  }
-  ```
+
+### 2.0.1. Search Products By Image
+- **URL**: `/api/search/products/by-image`
+- **Method**: `POST`
+- **Description**: Tìm kiếm sản phẩm bằng ảnh (semantic image search).
+- **Authentication**: Không yêu cầu.
+- **Request**: `multipart/form-data`, field `image`.
+- **Query Parameters**: `page` (default 0), `size` (default 12), `activeOnly` (default true).
+- **Success Response** (200 OK): `ProductSearchPageResponse`.
+
+### 2.0.2. Suggest Similar Products
+- **URL**: `/api/search/products/similar`
+- **Method**: `GET`
+- **Description**: Gợi ý sản phẩm tương tự theo `productId`.
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**: `productId` (required), `page`, `size`, `activeOnly`.
+- **Success Response** (200 OK): `ProductSearchPageResponse`.
+
+### 2.0.3. Suggest Keywords
+- **URL**: `/api/search/products/suggestions`
+- **Method**: `GET`
+- **Description**: Gợi ý từ khóa tìm kiếm theo prefix.
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**: `query` (required), `size` (default 8).
+- **Success Response** (200 OK): `ProductSearchSuggestionResponse`.
+
+### 2.0.4. Trending Searches
+- **URL**: `/api/search/products/trending`
+- **Method**: `GET`
+- **Description**: Trả về danh sách từ khóa trending trong N ngày gần đây.
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**: `days` (default 7), `size` (default 10).
+- **Success Response** (200 OK): `ProductSearchTrendingResponse`.
 
 ### 2.1. List Products (Database)
 - **URL**: `/api/products`
@@ -52,28 +64,42 @@
   - `sortDir` (`asc`/`desc`; default `desc`).
   - `page` (int, default `0`).
   - `size` (int, default `12`).
-- **Success Response** (200 OK): Spring Page of `ProductListResponse`, e.g.
+- **Success Response** (200 OK): Spring Page of `ProductListResponse`.
+
+### 2.2. List Products By Category Id
+- **URL**: `/api/products/categories/{categoryId}`
+- **Method**: `GET`
+- **Description**: Lọc sản phẩm theo `categoryId` (bao gồm cả sub-categories).
+- **Authentication**: Không yêu cầu.
+- **Path Parameters**: `categoryId` (Long).
+- **Query Parameters**: `brand`, `minPrice`, `maxPrice`, `keyword`, `sortBy`, `sortDir`, `page`, `size` (giống 2.1).
+- **Success Response** (200 OK): Spring Page of `ProductListResponse`.
+
+### 2.3. Get Featured Products
+- **URL**: `/api/products/featured`
+- **Method**: `GET`
+- **Description**: Lấy danh sách sản phẩm nổi bật.
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**: `limit` (int, default 8).
+- **Success Response** (200 OK): `List<ProductListResponse>`.
+
+### 2.4. Get Newest Products
+- **URL**: `/api/products/new`
+- **Method**: `GET`
+- **Description**: Lấy danh sách sản phẩm mới nhất.
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**: `limit` (int, default 8).
+- **Success Response** (200 OK): `List<ProductListResponse>`.
+
+### 2.5. Check Slug Exists
+- **URL**: `/api/products/search/existsBySlug`
+- **Method**: `GET`
+- **Description**: Kiểm tra slug sản phẩm đã tồn tại chưa (dùng khi tạo/sửa sản phẩm).
+- **Authentication**: Không yêu cầu.
+- **Query Parameters**: `slug` (String, required).
+- **Success Response** (200 OK):
   ```json
-  {
-    "content": [
-      {
-        "id": 100,
-        "name": "Vợt Yonex NanoFlare",
-        "slug": "yonex-nanoflare",
-        "shortDescription": "Vợt cầu lông nhẹ",
-        "thumbnailUrl": "https://cdn.example.com/vot.png",
-        "basePrice": 3500000,
-        "brandName": "Yonex",
-        "categoryName": "Vợt"
-      }
-    ],
-    "pageable": {
-      "pageNumber": 0,
-      "pageSize": 12
-    },
-    "totalElements": 45,
-    "totalPages": 4
-  }
+  { "exists": true }
   ```
 
 ### 3.2. Get Product by Id

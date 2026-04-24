@@ -45,27 +45,46 @@ This document describes all Promotion endpoints using the standardized response 
   "isActive": true
 }
 ```
-- Success Response (200 OK):
+- Success Response (201 Created): `PromotionResponse`.
+
+### 1.1. Bulk Create Promotions
+- URL: `/api/promotions/bulk`
+- Method: `POST`
+- Authentication: Required (ADMIN)
+- Description: Creates multiple promotion codes in a single request.
+- Validation:
+  - List must not be empty.
+  - No duplicate codes within the same request.
+  - No code may already exist in the database.
+  - Each item follows the same validation rules as single create.
+- Request Body:
 ```json
-{
-  "message": "Promotion created successfully.",
-  "status": "success",
-  "statusCode": 200,
-  "data": {
-    "id": 1,
+[
+  {
     "code": "SAVE20",
     "discountType": "PERCENTAGE",
-    "discountValue": 20.0,
-    "minOrderValue": 300000.0,
-    "maxDiscountAmount": 100000.0,
+    "discountValue": 20,
+    "minOrderValue": 300000,
+    "maxDiscountAmount": 100000,
     "maxUsage": 500,
-    "currentUsage": 0,
     "startDate": "2026-03-20T00:00:00",
     "expiryDate": "2026-04-30T23:59:59",
     "isActive": true
+  },
+  {
+    "code": "FREESHIP",
+    "discountType": "FREE_SHIP",
+    "discountValue": 0,
+    "minOrderValue": 200000,
+    "maxDiscountAmount": null,
+    "maxUsage": 200,
+    "startDate": "2026-04-01T00:00:00",
+    "expiryDate": "2026-04-30T23:59:59",
+    "isActive": true
   }
-}
+]
 ```
+- Success Response (201 Created): `List<PromotionResponse>`.
 
 ### 2. Update Promotion
 - URL: `/api/promotions/{id}`

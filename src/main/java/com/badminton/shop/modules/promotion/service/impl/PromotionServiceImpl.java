@@ -25,7 +25,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -66,6 +70,51 @@ public class PromotionServiceImpl implements PromotionService {
         Promotion saved = promotionRepository.save(promotion);
         evictPromotionCache(saved.getCode());
         return toResponse(saved);
+    }
+
+    @Override
+    public List<PromotionResponse> createPromotions(List<PromotionRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Promotion list must not be empty.");
+        }
+
+        // Kiểm tra trùng code trong chính request
+        Set<String> codesInRequest = new HashSet<>();
+        for (PromotionRequest req : requests) {
+            String normalized = normalizeCode(req.getCode());
+            if (!codesInRequest.add(normalized)) {
+                throw new IllegalArgumentException("Duplicate promotion code in request: " + normalized);
+            }
+        }
+
+        // Kiểm tra trùng với DB
+        for (PromotionRequest req : requests) {
+            String normalized = normalizeCode(req.getCode());
+            if (promotionRepository.existsByCodeIgnoreCase(normalized)) {
+                throw new IllegalArgumentException("Promotion code already exists: " + normalized);
+            }
+            validatePromotionRequest(req);
+        }
+
+        List<Promotion> promotions = new ArrayList<>();
+        for (PromotionRequest req : requests) {
+            promotions.add(Promotion.builder()
+                    .code(normalizeCode(req.getCode()))
+                    .discountType(req.getDiscountType())
+                    .discountValue(req.getDiscountValue())
+                    .minOrderValue(req.getMinOrderValue())
+                    .maxDiscountAmount(req.getMaxDiscountAmount())
+                    .maxUsage(req.getMaxUsage())
+                    .currentUsage(0)
+                    .startDate(req.getStartDate())
+                    .expiryDate(req.getExpiryDate())
+                    .isActive(Boolean.TRUE.equals(req.getIsActive()))
+                    .build());
+        }
+
+        List<Promotion> saved = promotionRepository.saveAll(promotions);
+        saved.forEach(p -> evictPromotionCache(p.getCode()));
+        return saved.stream().map(this::toResponse).toList();
     }
 
     @Override

@@ -142,6 +142,7 @@ This document describes all endpoints in the Authentication module using a stand
 ### 6. Resend Verification Email
 - URL: `/api/auth/resend-verification`
 - Method: `POST`
+- Authentication: Không yêu cầu (public).
 - Description: Resends verification token if account is not verified.
 - Request Body:
   ```json

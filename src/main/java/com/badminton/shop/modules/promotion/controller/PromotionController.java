@@ -9,6 +9,7 @@ import com.badminton.shop.modules.promotion.service.PromotionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/promotions")
 @RequiredArgsConstructor
@@ -32,7 +35,17 @@ public class PromotionController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PromotionResponse>> createPromotion(@Valid @RequestBody PromotionRequest request) {
         PromotionResponse response = promotionService.createPromotion(request);
-        return ResponseEntity.ok(ApiResponse.success("Promotion created successfully.", response));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Promotion created successfully.", response));
+    }
+
+    @PostMapping("/bulk")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<PromotionResponse>>> createPromotions(
+            @Valid @RequestBody List<@Valid PromotionRequest> requests) {
+        List<PromotionResponse> response = promotionService.createPromotions(requests);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Promotions created successfully.", response));
     }
 
     @PutMapping("/{id}")

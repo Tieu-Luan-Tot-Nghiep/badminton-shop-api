@@ -110,3 +110,42 @@ Module Dashboard - Thống kê & Báo cáo (Chỉ dành cho ADMIN)
     "estimatedValue": 152000.00
   }
 }
+
+
+5. KPI VÀ THÔNG TIN NHANH
+- Mô tả: Trả về các chỉ số KPI tổng hợp (tổng đơn hàng, doanh thu, người dùng mới...).
+- Method: GET
+- Endpoint: /api/admin/dashboard/kpis
+
+- Response (200 OK):
+{
+  "code": 200,
+  "message": "Lấy KPIs thành công",
+  "data": { ... }
+}
+
+
+6. ĐƠN HÀNG GẦN ĐÂY
+- Mô tả: Trả về danh sách đơn hàng gần đây nhất.
+- Method: GET
+- Endpoint: /api/admin/dashboard/recent-orders
+
+- Response (200 OK):
+{
+  "code": 200,
+  "message": "Lấy đơn hàng gần đây thành công",
+  "data": [ ... ]
+}
+
+
+7. CẢNH BÁO HỆ THỐNG (ALERTS)
+- Mô tả: Trả về danh sách cảnh báo (hàng sắp hết, đơn chờ xử lý...).
+- Method: GET
+- Endpoint: /api/admin/dashboard/alerts
+
+- Response (200 OK):
+{
+  "code": 200,
+  "message": "Lấy cảnh báo (alerts) thành công",
+  "data": [ ... ]
+}

@@ -48,29 +48,60 @@ public class SecurityConfig {
                             "/api/auth/verify-email",
                             "/api/auth/forgot-password",
                             "/api/auth/reset-password",
+                            "/api/auth/resend-verification",
                             "/api/shipping/webhook/ghn",
-                                "/oauth2/**",
-                                "/auth/**",
-                                "/reset-password.html",
-                                "/chat-test.html",
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/v3/api-docs",
-                                "/v3/api-docs.yaml",
-                                "/webjars/**"
+                            "/oauth2/**",
+                            "/auth/**",
+                            "/reset-password.html",
+                            "/chat-test.html",
+                            "/swagger-ui.html",
+                            "/swagger-ui/**",
+                            "/v3/api-docs/**",
+                            "/v3/api-docs",
+                            "/v3/api-docs.yaml",
+                            "/webjars/**"
                         ).permitAll()
-                                .requestMatchers("/api/inventory/system/**").hasRole("ADMIN")
-                                .requestMatchers("/api/inventory/admin/**").hasRole("ADMIN")
-                                .requestMatchers(HttpMethod.GET, "/api/reviews/my").authenticated()
-                            .requestMatchers(HttpMethod.GET, "/api/search/products/**", "/api/products/search/**","/api/search/products/image**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/orders/vnpay-return", "/api/orders/vnpay-ipn").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/reviews/*", "/api/reviews/products/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/products/featured", "/api/products/new").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/cart/**", "/api/cart").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
+                        // Inventory: system APIs chỉ dùng nội bộ, admin APIs yêu cầu ADMIN
+                        .requestMatchers("/api/inventory/system/**").hasRole("ADMIN")
+                        .requestMatchers("/api/inventory/admin/**").hasRole("ADMIN")
+                        // Admin-only endpoints
                         .requestMatchers(HttpMethod.GET, "/api/products/admin", "/api/products/admin/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*").permitAll()
+                        // Authenticated-only endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/my").authenticated()
+                        // VNPay callbacks — public (gọi từ cổng thanh toán)
+                        .requestMatchers(HttpMethod.GET, "/api/orders/vnpay-return", "/api/orders/vnpay-ipn").permitAll()
+                        // Products — public
+                        .requestMatchers(HttpMethod.GET,
+                            "/api/products",
+                            "/api/products/*",
+                            "/api/products/categories/**",
+                            "/api/products/featured",
+                            "/api/products/new",
+                            "/api/products/compare",
+                            "/api/products/search/existsBySlug"
+                        ).permitAll()
+                        // Search — public
+                        .requestMatchers(HttpMethod.GET,
+                            "/api/search/products",
+                            "/api/search/products/**"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/search/products/by-image").permitAll()
+                        // Categories & Brands — public
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
+                        // Reviews — public (đọc), riêng /my cần auth (đã khai báo trên)
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/*", "/api/reviews/products/**").permitAll()
+                        // Promotions — validate và xem mã là public
+                        .requestMatchers(HttpMethod.GET, "/api/promotions/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/promotions/validate").permitAll()
+                        // Shipping — địa chỉ giao hàng là public (cần khi checkout)
+                        .requestMatchers(HttpMethod.GET,
+                            "/api/shipping/provinces",
+                            "/api/shipping/provinces/*/districts",
+                            "/api/shipping/districts/*/wards"
+                        ).permitAll()
+                        // Cart — public (guest cart)
+                        .requestMatchers(HttpMethod.GET, "/api/cart", "/api/cart/**").permitAll()
+                        // WebSocket chat
                         .requestMatchers("/ws-chat/**").permitAll()
                         .anyRequest().authenticated()
                 )
