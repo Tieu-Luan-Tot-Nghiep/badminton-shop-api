@@ -84,6 +84,9 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             Boolean activeOnly,
             Boolean useSemantic
     ) {
+        log.info("[search] Starting search with keyword='{}', category='{}', brand='{}', page={}, size={}", 
+                safeLogKeyword(keyword), category, brand, page, size);
+        
         logSearchKeyword(keyword);
 
         int safePage = Math.max(page, 0);
@@ -97,6 +100,8 @@ public class ProductSearchServiceImpl implements ProductSearchService {
 
         try {
             hits = executeKeywordSearch(query, pageable, sortBy, sortDir, semanticRequested, keyword, true, true);
+            log.info("[search] Primary search succeeded. Found {} results for keyword='{}'", 
+                    hits.getTotalHits(), safeLogKeyword(keyword));
         } catch (RuntimeException primaryEx) {
             log.warn("[search] primary query failed; semanticRequested={}, keyword='{}', reason={}",
                     semanticRequested, safeLogKeyword(keyword), extractRootCauseMessage(primaryEx));
@@ -133,6 +138,7 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                 .map(this::toSearchItem)
                 .toList();
 
+        log.info("[search] Returning {} results for keyword='{}'", content.size(), safeLogKeyword(keyword));
         return toPageResponse(content, hits, safePage, safeSize);
     }
 
@@ -491,13 +497,31 @@ public class ProductSearchServiceImpl implements ProductSearchService {
     @Override
     @Async("searchSyncExecutor")
     public CompletableFuture<Void> reindexAllProducts() {
+        log.info("[reindex] Starting product reindex operation");
         try {
-            List<ProductSearchDocument> documents = productRepository.findAllForSearchSync().stream()
+            List<Product> products = productRepository.findAllForSearchSync();
+            log.info("[reindex] Found {} products to index", products.size());
+            
+            List<ProductSearchDocument> documents = products.stream()
                     .map(this::toSearchDocument)
                     .toList();
-            productSearchRepository.saveAll(documents);
+            
+            log.info("[reindex] Converted {} products to search documents", documents.size());
+            
+            // Save in batches to avoid memory issues
+            int batchSize = 100;
+            for (int i = 0; i < documents.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, documents.size());
+                List<ProductSearchDocument> batch = documents.subList(i, endIndex);
+                productSearchRepository.saveAll(batch);
+                log.info("[reindex] Saved batch {}/{} ({} documents)", 
+                        (i / batchSize) + 1, (documents.size() + batchSize - 1) / batchSize, batch.size());
+            }
+            
+            log.info("[reindex] Product reindex completed successfully");
             return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
+            log.error("[reindex] Product reindex failed", e);
             return CompletableFuture.failedFuture(e);
         }
     }
@@ -522,10 +546,34 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             b.filter(f -> f.term(t -> t.field("isDeleted").value(false)));
 
             if (hasKeyword) {
-                b.must(m -> m.multiMatch(mm -> mm
-                        .query(keyword)
-                        .fields("name^10", "shortDescription^2", "description", "brandName", "categoryName")
-                        .fuzziness("AUTO")
+                // Use bool query with multiple strategies for better relevance
+                b.must(m -> m.bool(bq -> bq
+                        // Exact phrase match gets highest priority
+                        .should(s -> s.matchPhrase(mp -> mp
+                                .field("name")
+                                .query(keyword)
+                                .boost(20.0f)
+                        ))
+                        // Prefix match for name gets high priority
+                        .should(s -> s.prefix(p -> p
+                                .field("name")
+                                .value(keyword)
+                                .boost(15.0f)
+                        ))
+                        // Multi-match with reduced fuzziness
+                        .should(s -> s.multiMatch(mm -> mm
+                                .query(keyword)
+                                .fields("name^10", "shortDescription^2", "description", "brandName", "categoryName")
+                                .fuzziness("1") // Reduced from AUTO to 1 for better precision
+                                .boost(5.0f)
+                        ))
+                        // Wildcard search as fallback
+                        .should(s -> s.wildcard(w -> w
+                                .field("name")
+                                .value("*" + keyword.toLowerCase() + "*")
+                                .boost(3.0f)
+                        ))
+                        .minimumShouldMatch("1")
                 ));
             }
             if (hasCategory) {

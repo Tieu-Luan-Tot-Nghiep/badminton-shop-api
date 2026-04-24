@@ -39,6 +39,13 @@ public class RabbitMQConfig {
     public static final String ORDER_CANCELLATION_EMAIL_ROUTING_KEY = "email.order-cancellation.routingKey";
     public static final String ORDER_CONFIRMATION_EMAIL_QUEUE = "email.order-confirmation.queue";
     public static final String ORDER_CONFIRMATION_EMAIL_ROUTING_KEY = "email.order-confirmation.routingKey";
+    
+    // Search Reindex Queue
+    public static final String SEARCH_EXCHANGE = "search.exchange";
+    public static final String SEARCH_REINDEX_QUEUE = "search.reindex.queue";
+    public static final String SEARCH_REINDEX_ROUTING_KEY = "search.reindex.routingKey";
+    public static final String SEARCH_REINDEX_BATCH_QUEUE = "search.reindex.batch.queue";
+    public static final String SEARCH_REINDEX_BATCH_ROUTING_KEY = "search.reindex.batch.routingKey";
 
     @Bean
     public Queue emailVerificationQueue() {
@@ -96,6 +103,22 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue searchReindexQueue() {
+        return QueueBuilder.durable(SEARCH_REINDEX_QUEUE)
+                .withArgument("x-message-ttl", 3600000) // 1 hour TTL
+                .withArgument("x-max-retries", 3)
+                .build();
+    }
+
+    @Bean
+    public Queue searchReindexBatchQueue() {
+        return QueueBuilder.durable(SEARCH_REINDEX_BATCH_QUEUE)
+                .withArgument("x-message-ttl", 1800000) // 30 minutes TTL
+                .withArgument("x-max-retries", 5)
+                .build();
+    }
+
+    @Bean
     public DirectExchange emailExchange() {
         return new DirectExchange(EMAIL_EXCHANGE);
     }
@@ -123,6 +146,11 @@ public class RabbitMQConfig {
     @Bean
     public DirectExchange chatExchange() {
         return new DirectExchange(CHAT_EXCHANGE);
+    }
+
+    @Bean
+    public DirectExchange searchExchange() {
+        return new DirectExchange(SEARCH_EXCHANGE);
     }
 
     @Bean
@@ -178,6 +206,16 @@ public class RabbitMQConfig {
     @Bean
     public Binding chatMessagePersistBinding(Queue chatMessagePersistQueue, DirectExchange chatExchange) {
         return BindingBuilder.bind(chatMessagePersistQueue).to(chatExchange).with(CHAT_MESSAGE_PERSIST_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding searchReindexBinding(Queue searchReindexQueue, DirectExchange searchExchange) {
+        return BindingBuilder.bind(searchReindexQueue).to(searchExchange).with(SEARCH_REINDEX_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding searchReindexBatchBinding(Queue searchReindexBatchQueue, DirectExchange searchExchange) {
+        return BindingBuilder.bind(searchReindexBatchQueue).to(searchExchange).with(SEARCH_REINDEX_BATCH_ROUTING_KEY);
     }
 
     @Bean
