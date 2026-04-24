@@ -25,7 +25,7 @@ public class PromotionRequest {
     private DiscountType discountType;
 
     @NotNull(message = "Discount value is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Discount value must be greater than 0")
+    @DecimalMin(value = "0.0", inclusive = true, message = "Discount value must be >= 0")
     private Double discountValue;
 
     @DecimalMin(value = "0.0", message = "Minimum order value must be >= 0")
