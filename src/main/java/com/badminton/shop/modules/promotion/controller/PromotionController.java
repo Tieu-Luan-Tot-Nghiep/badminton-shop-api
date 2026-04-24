@@ -69,11 +69,10 @@ public class PromotionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Page<PromotionResponse>>> getPromotions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "false") Boolean activeOnly
+            @RequestParam(defaultValue = "true") Boolean activeOnly
     ) {
         Page<PromotionResponse> response = promotionService.getPromotions(page, size, activeOnly);
         return ResponseEntity.ok(ApiResponse.success("Promotions fetched successfully.", response));

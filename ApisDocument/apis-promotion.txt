@@ -128,10 +128,14 @@ This document describes all Promotion endpoints using the standardized response 
 ```
 
 ### 4. Get Promotion List
-- URL: `/api/promotions?page=0&size=10&activeOnly=false`
+- URL: `/api/promotions?page=0&size=10&activeOnly=true`
 - Method: `GET`
-- Authentication: Required (ADMIN)
-- Description: Returns paginated list of promotions.
+- Authentication: Public (không yêu cầu token)
+- Description: Returns paginated list of promotions. Default shows only active promotions.
+- Query Parameters:
+  - `page` (int, default 0)
+  - `size` (int, default 10)
+  - `activeOnly` (boolean, default true) — set false to see all promotions including inactive ones
 - Success Response (200 OK):
 ```json
 {

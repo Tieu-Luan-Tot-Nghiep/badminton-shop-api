@@ -91,7 +91,7 @@ public class SecurityConfig {
                         // Reviews — public (đọc), riêng /my cần auth (đã khai báo trên)
                         .requestMatchers(HttpMethod.GET, "/api/reviews/*", "/api/reviews/products/**").permitAll()
                         // Promotions — validate và xem mã là public
-                        .requestMatchers(HttpMethod.GET, "/api/promotions/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/promotions", "/api/promotions/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/promotions/validate").permitAll()
                         // Shipping — địa chỉ giao hàng là public (cần khi checkout)
                         .requestMatchers(HttpMethod.GET,
