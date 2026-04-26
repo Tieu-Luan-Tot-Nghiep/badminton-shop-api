@@ -14,8 +14,6 @@ pipeline {
         ECR_IMAGE_LATEST = "283209027400.dkr.ecr.us-east-1.amazonaws.com/${APP_NAME}:latest"
         ECR_IMAGE_VERSION = "283209027400.dkr.ecr.us-east-1.amazonaws.com/${APP_NAME}:${BUILD_NUMBER}"
         CONTAINER_NAME = 'badminton-shop'
-        HOST_PORT = '80'
-        CONTAINER_PORT = '8080'
         DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     }
 
@@ -58,18 +56,17 @@ pipeline {
                 withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
                     sh '''
                         set -e
-                        cp "$ENV_FILE" .env
-                        trap 'rm -f .env' EXIT
-
-                        # Login ECR
+                        # Đăng nhập AWS ECR
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
                         
-                        # Build and Tag
+                        # Build Docker image từ file .jar vừa tạo
                         docker build -t $LOCAL_IMAGE .
+                        
+                        # Gắn tag image theo bản Latest và Build Number
                         docker tag $LOCAL_IMAGE:latest $ECR_IMAGE_LATEST
                         docker tag $LOCAL_IMAGE:latest $ECR_IMAGE_VERSION
                         
-                        # Push
+                        # Đẩy image lên kho lưu trữ AWS
                         docker push $ECR_IMAGE_LATEST
                         docker push $ECR_IMAGE_VERSION
                     '''
@@ -80,36 +77,46 @@ pipeline {
         stage('Deploy') {
             when { expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' } }
             steps {
-                // Bổ sung credentials cho Database tại đây
-                withCredentials([
-                    file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE'),
-                    string(credentialsId: 'db-name', variable: 'DB_NAME'),
-                    string(credentialsId: 'db-user', variable: 'DB_USERNAME'),
-                    string(credentialsId: 'db-pass', variable: 'DB_PASSWORD')
-                ]) {
+                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
                     sh '''
                         set -e
+                        # 1. Chuẩn bị file môi trường
                         cp "$ENV_FILE" .env
                         trap 'rm -f .env' EXIT
 
+                        # 2. Đăng nhập để kéo Image về máy chủ Deploy
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-                        export APP_IMAGE="$ECR_IMAGE_VERSION"
-                        export POSTGRES_DB="$DB_NAME"
-                        export POSTGRES_USER="$DB_USERNAME"
-                        export POSTGRES_PASSWORD="$DB_PASSWORD"
+                        # 3. Nạp biến từ file .env vào môi trường thực thi của shell
+                        set -a
+                        [ -f .env ] && . ./.env
+                        set +a
 
+                        # 4. Gán biến Image Version để Docker Compose sử dụng
+                        export APP_IMAGE="$ECR_IMAGE_VERSION"
+
+                        # 5. Triển khai dịch vụ
+                        echo 'Starting services with Docker Compose...'
                         docker compose -f "$DOCKER_COMPOSE_FILE" pull app
                         docker compose -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
 
+                        # 6. Kiểm tra sức khỏe của Database
                         echo 'Waiting for postgres to become healthy...'
                         for i in {1..30}; do
-                            if [ "$(docker inspect -f "{{.State.Health.Status}}" postgres 2>/dev/null)" == "healthy" ]; then
-                                echo "PostgreSQL is ready."
+                            STATUS=$(docker inspect -f "{{.State.Health.Status}}" postgres 2>/dev/null || echo "starting")
+                            if [ "$STATUS" == "healthy" ]; then
+                                echo "PostgreSQL is ready and healthy."
                                 break
+                            fi
+                            if [ "$i" == "30" ]; then
+                                echo "ERROR: PostgreSQL failed to become healthy."
+                                docker logs postgres
+                                exit 1
                             fi
                             sleep 2
                         done
+
+                        docker compose -f "$DOCKER_COMPOSE_FILE" ps
                     '''
                 }
             }
@@ -117,7 +124,7 @@ pipeline {
     }
 
     post {
-        success { echo 'Deployment successful!' }
-        failure { echo 'Pipeline failed. Check logs for details.' }
+        success { echo 'Deployment completed successfully!' }
+        failure { echo 'Deployment failed. Please check the logs above.' }
     }
 }
