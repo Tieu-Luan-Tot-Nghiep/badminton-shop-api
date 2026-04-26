@@ -97,8 +97,8 @@ pipeline {
 
                         # 5. Triển khai dịch vụ
                         echo 'Starting services with Docker Compose...'
-                        docker compose -f "$DOCKER_COMPOSE_FILE" pull app
-                        docker compose -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
+                        docker-compose -f "$DOCKER_COMPOSE_FILE" pull app
+                        docker-compose -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
 
                         # 6. Kiểm tra sức khỏe của Database
                         echo 'Waiting for postgres to become healthy...'
