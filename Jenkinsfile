@@ -85,10 +85,14 @@ pipeline {
 
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-                        # Nạp biến môi trường
+                        # TẮT IN LOG TRƯỚC KHI ĐỌC FILE NHẠY CẢM
+                        set +x
+                        echo "Loading environment variables..."
                         set -a
                         [ -f .env ] && . ./.env
                         set +a
+                        # BẬT LẠI IN LOG SAU KHI NẠP XONG
+                        set -x
 
                         export APP_IMAGE="$ECR_IMAGE_VERSION"
 
