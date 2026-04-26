@@ -10,13 +10,12 @@ pipeline {
         APP_NAME = 'badminton-shop'
         AWS_REGION = 'us-east-1'
         ECR_REGISTRY = '283209027400.dkr.ecr.us-east-1.amazonaws.com'
-        LOCAL_IMAGE = 'badmintion-shop'
-        ECR_IMAGE_LATEST = '283209027400.dkr.ecr.us-east-1.amazonaws.com/badmintion-shop:latest'
-        ECR_IMAGE_VERSION = "283209027400.dkr.ecr.us-east-1.amazonaws.com/badmintion-shop:${BUILD_NUMBER}"
-        CONTAINER_NAME = 'badmintion-shop'
+        LOCAL_IMAGE = 'badminton-shop'
+        ECR_IMAGE_LATEST = "283209027400.dkr.ecr.us-east-1.amazonaws.com/${APP_NAME}:latest"
+        ECR_IMAGE_VERSION = "283209027400.dkr.ecr.us-east-1.amazonaws.com/${APP_NAME}:${BUILD_NUMBER}"
+        CONTAINER_NAME = 'badminton-shop'
         HOST_PORT = '80'
         CONTAINER_PORT = '8080'
-        // CLIP/Python service removed
         DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     }
 
@@ -31,34 +30,15 @@ pipeline {
             steps {
                 sh '''
                     set -e
-
-                    echo '=== Disk usage before cleanup ==='
-                    df -h
-                    df -ih || true
-                    docker system df || true
-
-                    # Free stale Docker artifacts to avoid Gradle/Build failures on low disk.
+                    echo '=== Cleaning up disk space ==='
                     docker container prune -f || true
-                    docker image prune -af --filter 'until=24h' || true
-                    docker volume prune -f || true
+                    docker image prune -af --filter "until=24h" || true
                     docker builder prune -af || true
-
-                    rm -rf "$WORKSPACE/.gradle" || true
-                    rm -rf "$WORKSPACE/build" || true
-                    rm -rf "$HOME/.cache/pip" || true
-
-                    # Prevent Docker json logs from filling the root disk.
-                    find /var/lib/docker/containers -name '*-json.log' -type f -size +100M -exec truncate -s 0 {} ';' 2>/dev/null || true
-
-                    echo '=== Disk usage after cleanup ==='
-                    df -h
-                    df -ih || true
-                    docker system df || true
-
-                    # Require at least 2GB free before build to avoid random Gradle failures.
+                    rm -rf "$WORKSPACE/.gradle" "$WORKSPACE/build" || true
+                    
                     AVAIL_KB=$(df --output=avail / | tail -1 | tr -d ' ')
                     if [ "$AVAIL_KB" -lt 2097152 ]; then
-                        echo 'ERROR: less than 2GB free on /. Please increase disk size or remove running containers/artifacts.'
+                        echo 'ERROR: Less than 2GB free disk space.'
                         exit 1
                     fi
                 '''
@@ -68,165 +48,76 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'chmod +x ./gradlew'
-                sh 'GRADLE_USER_HOME="$WORKSPACE/.gradle" ./gradlew clean bootJar -x test --no-daemon'
+                sh './gradlew clean bootJar -x test --no-daemon'
             }
         }
 
-        stage('Archive Artifact') {
-            steps {
-                archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true
-            }
-        }
-
-        stage('Verify Env File') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
+        stage('Verify & Push Image') {
+            when { expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' } }
             steps {
                 withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
                     sh '''
                         set -e
-
-                        cp "$ENV_FILE" .env
-                        ls -la .env
-
-                        # Show only variable names for safety.
-                        head -n 3 .env | sed 's/=.*$/=***masked***/'
-
-                        if grep -q '^AWS_REGION=' .env; then
-                            echo 'Bien AWS_REGION da ton tai trong file .env'
-                        else
-                            echo 'KHONG tim thay AWS_REGION trong file .env'
-                        fi
-
-                        if grep -q '^CLIP_MODEL_PATH=' .env; then
-                            echo 'Bien CLIP_MODEL_PATH da ton tai trong file .env'
-                        else
-                            echo 'KHONG tim thay CLIP_MODEL_PATH trong file .env (se su dung gia tri rong khi run container)'
-                        fi
-
-                        if grep -q '^POSTGRES_DB=' .env; then
-                            echo 'Bien POSTGRES_DB da ton tai trong file .env'
-                        else
-                            echo 'KHONG tim thay POSTGRES_DB trong file .env (se su dung gia tri mac dinh badminton_shop)'
-                        fi
-
-                        if grep -q '^POSTGRES_USER=' .env; then
-                            echo 'Bien POSTGRES_USER da ton tai trong file .env'
-                        else
-                            echo 'KHONG tim thay POSTGRES_USER trong file .env (se su dung gia tri mac dinh postgres)'
-                        fi
-
-                        if grep -q '^POSTGRES_PASSWORD=' .env; then
-                            echo 'Bien POSTGRES_PASSWORD da ton tai trong file .env'
-                        else
-                            echo 'KHONG tim thay POSTGRES_PASSWORD trong file .env (se su dung gia tri mac dinh postgres)'
-                        fi
-
-                        rm -f .env
-                    '''
-                }
-            }
-        }
-
-        stage('Push Image To ECR') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
-            steps {
-                echo 'Build passed. Login ECR and push Docker image...'
-                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
-                    sh '''
-                        set -e
-
                         cp "$ENV_FILE" .env
                         trap 'rm -f .env' EXIT
 
+                        # Login ECR
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                        
+                        # Build and Tag
                         docker build -t $LOCAL_IMAGE .
                         docker tag $LOCAL_IMAGE:latest $ECR_IMAGE_LATEST
                         docker tag $LOCAL_IMAGE:latest $ECR_IMAGE_VERSION
+                        
+                        # Push
                         docker push $ECR_IMAGE_LATEST
                         docker push $ECR_IMAGE_VERSION
                     '''
                 }
-                echo "Push image ${ECR_IMAGE_LATEST} and ${ECR_IMAGE_VERSION} successfully."
             }
         }
 
-        stage('Deploy With Docker Compose') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
+        stage('Deploy') {
+            when { expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' } }
             steps {
-                echo 'Pull and run services by Docker Compose...'
-                withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
+                // Bổ sung credentials cho Database tại đây
+                withCredentials([
+                    file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE'),
+                    string(credentialsId: 'db-name', variable: 'DB_NAME'),
+                    string(credentialsId: 'db-user', variable: 'DB_USERNAME'),
+                    string(credentialsId: 'db-pass', variable: 'DB_PASSWORD')
+                ]) {
                     sh '''
                         set -e
-
                         cp "$ENV_FILE" .env
                         trap 'rm -f .env' EXIT
 
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-                        if docker compose version >/dev/null 2>&1; then
-                            COMPOSE_CMD="docker compose"
-                        elif command -v docker-compose >/dev/null 2>&1; then
-                            COMPOSE_CMD="docker-compose"
-                        else
-                            echo 'ERROR: Docker Compose is not installed on this Jenkins agent.'
-                            exit 1
-                        fi
-
                         export APP_IMAGE="$ECR_IMAGE_VERSION"
-                        export HOST_PORT="$HOST_PORT"
-                        export CONTAINER_PORT="$CONTAINER_PORT"
-                        export CONTAINER_NAME="$CONTAINER_NAME"
-                        export POSTGRES_DB="${POSTGRES_DB:-badminton_shop}"
-                        export POSTGRES_USER="${POSTGRES_USER:-postgres}"
-                        export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
-                        export DB_URL="${DB_URL:-jdbc:postgresql://postgres:5432/$POSTGRES_DB}"
-                        export DB_USERNAME="${DB_USERNAME:-$POSTGRES_USER}"
-                        export DB_PASSWORD="${DB_PASSWORD:-$POSTGRES_PASSWORD}"
-                        # CLIP/Python service removed
+                        export POSTGRES_DB="$DB_NAME"
+                        export POSTGRES_USER="$DB_USERNAME"
+                        export POSTGRES_PASSWORD="$DB_PASSWORD"
 
-                                                # Remove old container if exists to avoid name conflict
-                                                if docker ps -a --format '{{.Names}}' | grep -w "$CONTAINER_NAME" >/dev/null 2>&1; then
-                                                    docker rm -f "$CONTAINER_NAME"
-                                                fi
-                                                $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" pull app || true
-                                                $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
+                        docker compose -f "$DOCKER_COMPOSE_FILE" pull app
+                        docker compose -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
 
-                                                echo 'Waiting for postgres to become healthy...'
-                                                for i in $(seq 1 30); do
-                                                    DB_STATUS=$(docker inspect -f '{{.State.Health.Status}}' postgres 2>/dev/null || true)
-                                                    if [ "$DB_STATUS" = "healthy" ]; then
-                                                        echo 'PostgreSQL is healthy.'
-                                                        break
-                                                    fi
-                                                    if [ "$i" -eq 30 ]; then
-                                                        echo 'ERROR: PostgreSQL did not become healthy in time.'
-                                                        docker logs postgres || true
-                                                        exit 1
-                                                    fi
-                                                    sleep 2
-                                                done
-
-                                                $COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" ps
-
+                        echo 'Waiting for postgres to become healthy...'
+                        for i in {1..30}; do
+                            if [ "$(docker inspect -f "{{.State.Health.Status}}" postgres 2>/dev/null)" == "healthy" ]; then
+                                echo "PostgreSQL is ready."
+                                break
+                            fi
+                            sleep 2
+                        done
                     '''
                 }
-                echo "Services were deployed by Docker Compose using image ${ECR_IMAGE_VERSION}."
             }
         }
     }
 
     post {
-        success {
-            echo 'Pipeline completed: build and deploy succeeded.'
-        }
-        failure {
-            echo 'Pipeline failed. Deploy stage was skipped because build did not pass.'
-        }
+        success { echo 'Deployment successful!' }
+        failure { echo 'Pipeline failed. Check logs for details.' }
     }
 }
