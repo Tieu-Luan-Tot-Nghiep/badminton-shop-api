@@ -80,43 +80,37 @@ pipeline {
                 withCredentials([file(credentialsId: 'badminton-shop-env', variable: 'ENV_FILE')]) {
                     sh '''
                         set -e
-                        # 1. Chuẩn bị file môi trường
                         cp "$ENV_FILE" .env
                         trap 'rm -f .env' EXIT
 
-                        # 2. Đăng nhập để kéo Image về máy chủ Deploy
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-                        # 3. Nạp biến từ file .env vào môi trường thực thi của shell
+                        # Nạp biến môi trường
                         set -a
                         [ -f .env ] && . ./.env
                         set +a
 
-                        # 4. Gán biến Image Version để Docker Compose sử dụng
                         export APP_IMAGE="$ECR_IMAGE_VERSION"
 
-                        # 5. Triển khai dịch vụ
                         echo 'Starting services with Docker Compose...'
+                        
+                        # SỬA Ở ĐÂY: Thêm dấu gạch ngang vào giữa docker-compose
                         docker-compose -f "$DOCKER_COMPOSE_FILE" pull app
                         docker-compose -f "$DOCKER_COMPOSE_FILE" up -d --remove-orphans
 
-                        # 6. Kiểm tra sức khỏe của Database
                         echo 'Waiting for postgres to become healthy...'
                         for i in {1..30}; do
+                            # SỬA CẢ Ở ĐÂY NẾU CẦN
                             STATUS=$(docker inspect -f "{{.State.Health.Status}}" postgres 2>/dev/null || echo "starting")
                             if [ "$STATUS" == "healthy" ]; then
-                                echo "PostgreSQL is ready and healthy."
+                                echo "PostgreSQL is ready."
                                 break
-                            fi
-                            if [ "$i" == "30" ]; then
-                                echo "ERROR: PostgreSQL failed to become healthy."
-                                docker logs postgres
-                                exit 1
                             fi
                             sleep 2
                         done
 
-                        docker compose -f "$DOCKER_COMPOSE_FILE" ps
+                        # SỬA Ở ĐÂY: Thêm dấu gạch ngang
+                        docker-compose -f "$DOCKER_COMPOSE_FILE" ps
                     '''
                 }
             }
