@@ -130,7 +130,7 @@ pipeline {
 
     post {
         always {
-            junit 'build/test-results/test/*.xml'
+            junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
             archiveArtifacts artifacts: 'build/reports/tests/test/**', allowEmptyArchive: true
         }
         success { echo 'Deployment completed successfully!' }
