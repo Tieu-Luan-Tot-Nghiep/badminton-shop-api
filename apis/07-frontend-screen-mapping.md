@@ -213,9 +213,11 @@ Muc tieu: map endpoint backend sang man hinh frontend de AI Agent co the scaffol
 - Route: /account/membership
   - Type: Detail
   - Endpoint: GET /api/memberships/me
+  - UI hien thi: tier, currentPoints, totalPoints, pointsToNextTier, nextTierName
 - Route: /account/membership/history
   - Type: List
   - Endpoint: GET /api/memberships/me/history
+  - UI hien thi: points, reason, referenceId, createdAt
 
 ## 5) Chat + Chatbot
 

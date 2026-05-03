@@ -161,3 +161,17 @@ Base path: /api/memberships
 - Auth: Bearer User
 - Response data: List<PointHistoryResponse>
 - Code: 200, 401, 404
+
+### Quy tac tich diem
+- Quy doi: 10,000 VND = 1 diem (lam tron xuong).
+- Tich diem khi:
+  - VNPAY thanh toan thanh cong.
+  - COD giao thanh cong (khi GHN cap nhat DELIVERED hoac admin cap nhat DELIVERED).
+- Hoan/rollback diem khi:
+  - Don bi huy.
+  - Don bi hoan tien (refund).
+
+### Cap bac thanh vien
+- BRONZE, SILVER, GOLD, DIAMOND.
+- Xet hang dua tren tong diem tich luy (totalPoints).
+- Muc giam gia theo tier ap dung tren gia hang (itemsAmount).

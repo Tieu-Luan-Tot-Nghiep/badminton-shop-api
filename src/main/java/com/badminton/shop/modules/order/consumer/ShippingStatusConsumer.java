@@ -47,18 +47,22 @@ public class ShippingStatusConsumer {
 
         order.setStatus(mappedStatus);
 
-        if (mappedStatus == OrderStatus.DELIVERED
-                && order.getPaymentMethod() == PaymentMethod.COD
-                && order.getPaymentStatus() != PaymentStatus.COMPLETED) {
-            order.setPaymentStatus(PaymentStatus.COMPLETED);
-            try {
-                membershipService.addPointsFromOrder(
-                        order.getUser().getId(),
-                        java.math.BigDecimal.valueOf(order.getTotalAmount()),
-                        order.getId()
-                );
-            } catch (RuntimeException ignored) {
-                // Shipping status processing should remain resilient.
+        if (mappedStatus == OrderStatus.DELIVERED) {
+            if (order.getPaymentMethod() == PaymentMethod.COD
+                    && order.getPaymentStatus() != PaymentStatus.COMPLETED) {
+                order.setPaymentStatus(PaymentStatus.COMPLETED);
+            }
+
+            if (order.getPaymentStatus() == PaymentStatus.COMPLETED) {
+                try {
+                    membershipService.addPointsFromOrder(
+                            order.getUser().getId(),
+                            java.math.BigDecimal.valueOf(order.getTotalAmount()),
+                            order.getId()
+                    );
+                } catch (RuntimeException ignored) {
+                    // Shipping status processing should remain resilient.
+                }
             }
         }
 

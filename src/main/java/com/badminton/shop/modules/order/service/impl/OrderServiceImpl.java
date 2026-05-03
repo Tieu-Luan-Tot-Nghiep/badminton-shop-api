@@ -324,16 +324,6 @@ public class OrderServiceImpl implements OrderService {
                         .note("Thanh toán VNPAY thành công")
                         .build());
 
-                try {
-                    membershipService.addPointsFromOrder(
-                            order.getUser().getId(),
-                            BigDecimal.valueOf(order.getTotalAmount()),
-                            order.getId()
-                    );
-                } catch (RuntimeException ignored) {
-                    // Loyalty failure should not block payment success flow.
-                }
-
                 createShippingOrderIfApplicable(order);
             }
         } else {
@@ -1223,10 +1213,32 @@ public class OrderServiceImpl implements OrderService {
         
         order.setStatus(newStatus);
         
-        // Handle payment status if necessary based on your logic 
-        // Example: if status is DELIVERED and payment is COD, mark it COMPLETED?
-        if (newStatus == OrderStatus.DELIVERED && order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.PENDING) {
-            order.setPaymentStatus(PaymentStatus.COMPLETED);
+        // Handle payment status and loyalty points when admin marks order delivered.
+        if (newStatus == OrderStatus.DELIVERED) {
+            if (order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.PENDING) {
+                order.setPaymentStatus(PaymentStatus.COMPLETED);
+            }
+            try {
+                membershipService.addPointsFromOrder(
+                        order.getUser().getId(),
+                        BigDecimal.valueOf(order.getTotalAmount()),
+                        order.getId()
+                );
+            } catch (RuntimeException ignored) {
+                // Admin status update should not fail due to loyalty issue.
+            }
+        }
+
+        if (newStatus == OrderStatus.CANCELLED || newStatus == OrderStatus.REFUNDED) {
+            try {
+                membershipService.rollbackPointsFromOrder(
+                        order.getUser().getId(),
+                        order.getId(),
+                        newStatus == OrderStatus.REFUNDED ? "refund" : "cancel"
+                );
+            } catch (RuntimeException ignored) {
+                // Admin status update should not fail due to loyalty rollback issue.
+            }
         }
 
         order.getHistories().add(OrderHistory.builder()
