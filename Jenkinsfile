@@ -24,6 +24,13 @@ pipeline {
             }
         }
 
+        stage('Test') {
+            steps {
+                sh 'chmod +x ./gradlew'
+                sh './gradlew test --no-daemon'
+            }
+        }
+
         stage('Disk Preflight') {
             steps {
                 sh '''
@@ -122,6 +129,10 @@ pipeline {
     }
 
     post {
+        always {
+            junit 'build/test-results/test/*.xml'
+            archiveArtifacts artifacts: 'build/reports/tests/test/**', allowEmptyArchive: true
+        }
         success { echo 'Deployment completed successfully!' }
         failure { echo 'Deployment failed. Please check the logs above.' }
     }

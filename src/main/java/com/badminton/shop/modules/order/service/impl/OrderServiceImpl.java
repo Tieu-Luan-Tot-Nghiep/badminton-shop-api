@@ -34,6 +34,7 @@ import com.badminton.shop.modules.order.entity.ReturnRequestStatus;
 import com.badminton.shop.modules.order.repository.OrderItemRepository;
 import com.badminton.shop.modules.order.repository.OrderReturnRequestRepository;
 import com.badminton.shop.modules.order.repository.OrderRepository;
+import com.badminton.shop.modules.order.service.CartService;
 import com.badminton.shop.modules.order.service.OrderService;
 import com.badminton.shop.modules.promotion.dto.response.PromotionApplyResult;
 import com.badminton.shop.modules.promotion.service.PromotionService;
@@ -48,6 +49,7 @@ import com.badminton.shop.modules.shipping.service.ShippingService;
 import com.badminton.shop.config.RabbitMQConfig;
 import com.badminton.shop.utils.email.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -78,6 +80,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
@@ -92,6 +95,7 @@ public class OrderServiceImpl implements OrderService {
     private final ShippingService shippingService;
     private final RabbitTemplate rabbitTemplate;
     private final EmailService emailService;
+    private final CartService cartService;
 
     @Value("${vnpay.tmn-code}")
     private String vnpTmnCode;
@@ -238,6 +242,16 @@ public class OrderServiceImpl implements OrderService {
             );
         } catch (Exception e) {
             // Ignore email failure
+        }
+        
+        // Remove ordered items from user's cart
+        try {
+            for (CreateOrderRequest.OrderLineRequest line : request.getItems()) {
+                cartService.removeItem(principalName, line.getVariantId());
+            }
+        } catch (Exception e) {
+            // Log but don't fail the order if cart removal fails
+            log.warn("Failed to remove items from cart after order {} creation", saved.getOrderCode(), e);
         }
         
         return toOrderResponse(saved, paymentUrl);
