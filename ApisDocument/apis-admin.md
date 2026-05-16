@@ -265,6 +265,23 @@ Field trong `ReturnRequestResponse`:
 
 ## 6. Quan ly User Admin APIs
 
+### 6.0 Tao user moi
+
+- `POST /api/users/admin`
+- Body `AdminCreateUserRequest`
+
+```json
+{
+  "username": "staff01",
+  "email": "staff01@example.com",
+  "password": "password123",
+  "fullName": "Staff One",
+  "phoneNumber": "0123456789",
+  "role": "CUSTOMER",
+  "isActive": true
+}
+```
+
 ### 6.1 Lay danh sach user
 
 - `GET /api/users/admin`

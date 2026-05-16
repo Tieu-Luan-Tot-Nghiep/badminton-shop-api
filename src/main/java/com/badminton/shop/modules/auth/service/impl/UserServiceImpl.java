@@ -1,6 +1,8 @@
 package com.badminton.shop.modules.auth.service.impl;
 
 import com.badminton.shop.exception.ResourceNotFoundException;
+import com.badminton.shop.exception.UserAlreadyExistsException;
+import com.badminton.shop.modules.auth.dto.AdminCreateUserRequest;
 import com.badminton.shop.modules.auth.dto.UserProfileResponse;
 import com.badminton.shop.modules.auth.entity.Role;
 import com.badminton.shop.modules.auth.entity.User;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,32 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Override
+    @Transactional
+    public UserProfileResponse adminCreateUser(AdminCreateUserRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new UserAlreadyExistsException("Username is already taken");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new UserAlreadyExistsException("Email is already in use");
+        }
+
+        User user = User.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .fullName(request.getFullName())
+                .phoneNumber(request.getPhoneNumber())
+                .role(request.getRole() != null ? request.getRole() : Role.CUSTOMER)
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .isEmailVerified(true)
+                .build();
+
+        User saved = userRepository.save(user);
+        return toUserProfileResponse(saved);
+    }
 
     @Override
     @Transactional(readOnly = true)

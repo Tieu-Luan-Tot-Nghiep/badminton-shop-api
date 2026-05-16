@@ -1,10 +1,13 @@
 package com.badminton.shop.modules.admin.controller;
 
 import com.badminton.shop.common.dto.ApiResponse;
+import com.badminton.shop.modules.auth.dto.AdminCreateUserRequest;
 import com.badminton.shop.modules.auth.dto.UserProfileResponse;
 import com.badminton.shop.modules.auth.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +21,15 @@ import java.util.Map;
 public class AdminUserController {
 
     private final UserService userService;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<UserProfileResponse>> createUser(
+            @Valid @RequestBody AdminCreateUserRequest request
+    ) {
+        UserProfileResponse response = userService.adminCreateUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(HttpStatus.CREATED, "Create user successful", response));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getUsers(
