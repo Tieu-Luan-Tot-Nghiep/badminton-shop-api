@@ -2,6 +2,7 @@ package com.badminton.shop.exception;
 
 import com.badminton.shop.common.dto.ApiResponse;
 import com.badminton.shop.modules.shipping.exception.ShippingIntegrationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -75,6 +76,11 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        return createErrorResponse(HttpStatus.CONFLICT, resolveConflictMessage(ex));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
@@ -103,5 +109,24 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiResponse<Object>> createErrorResponse(HttpStatus status, String message) {
         return new ResponseEntity<>(ApiResponse.error(status, message), status);
+    }
+
+    private String resolveConflictMessage(Throwable ex) {
+        String message = ex.getMessage();
+        if (message == null) {
+            return "Dữ liệu đã tồn tại.";
+        }
+
+        String lowerMessage = message.toLowerCase();
+        if (lowerMessage.contains("phone_number") || lowerMessage.contains("phone number")) {
+            return "Phone number is already in use";
+        }
+        if (lowerMessage.contains("email")) {
+            return "Email is already in use";
+        }
+        if (lowerMessage.contains("username")) {
+            return "Username is already taken";
+        }
+        return "Dữ liệu đã tồn tại.";
     }
 }

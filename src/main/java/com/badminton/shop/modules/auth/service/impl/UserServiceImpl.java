@@ -40,6 +40,10 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new UserAlreadyExistsException("Email is already in use");
         }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()
+                && userRepository.existsByPhoneNumber(request.getPhoneNumber())) {
+            throw new UserAlreadyExistsException("Phone number is already in use");
+        }
 
         User user = User.builder()
                 .username(request.getUsername())

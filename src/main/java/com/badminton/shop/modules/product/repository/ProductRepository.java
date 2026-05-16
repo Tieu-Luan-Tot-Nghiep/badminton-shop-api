@@ -124,6 +124,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                                 """)
                 List<Product> findNewestProducts(Pageable pageable);
 
+                    @Query("""
+                            SELECT DISTINCT p FROM Product p
+                            LEFT JOIN FETCH p.variants v
+                            LEFT JOIN FETCH p.productImages pi
+                            LEFT JOIN FETCH p.brand b
+                            LEFT JOIN FETCH p.category c
+                            """)
+                    List<Product> findAllWithVariants();
+
                     @Query(
                             value = """
                                     SELECT
