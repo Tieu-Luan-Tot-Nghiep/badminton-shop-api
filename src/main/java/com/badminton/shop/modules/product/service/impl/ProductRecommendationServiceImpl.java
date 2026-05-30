@@ -34,27 +34,11 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
         Product sourceProduct = productRepository.findById(productId).orElse(null);
         String sourceProductName = sourceProduct != null ? sourceProduct.getName() : "Sản phẩm #" + productId;
 
-        List<ProductSearchItemResponse> recommendations = List.of();
-
         // Tầng 1: KNN vector similarity từ Elasticsearch (nếu đã reindex)
-        try {
-            ProductSearchPageResponse page = productSearchService.suggestSimilarProducts(
-                    productId, 0, safeSize, true
-            );
-            List<ProductSearchItemResponse> esResults = page.getContent() == null ? List.of() : page.getContent();
-            if (!esResults.isEmpty()) {
-                recommendations = esResults;
-                log.debug("[recommendation] KNN found {} results for productId={}", esResults.size(), productId);
-            }
-        } catch (com.badminton.shop.exception.ResourceNotFoundException ex) {
-            log.debug("[recommendation] Product {} not in Elasticsearch index, using DB fallback", productId);
-        } catch (IllegalStateException ex) {
-            log.debug("[recommendation] Product {} has no vector, using DB fallback: {}", productId, ex.getMessage());
-        } catch (Exception ex) {
-            log.debug("[recommendation] KNN failed for productId={}, using DB fallback: {}", productId, ex.getMessage());
-        }
+        // Gọi trong transaction riêng để tránh rollback-only contamination
+        List<ProductSearchItemResponse> recommendations = fetchFromElasticsearch(productId, safeSize);
 
-        // Tầng 2: DB fallback — cùng category
+        // Tầng 2: DB fallback — cùng category (khi Elasticsearch rỗng hoặc lỗi)
         if (recommendations.isEmpty() && sourceProduct != null) {
             recommendations = fetchFromDb(sourceProduct, safeSize);
         }
@@ -73,6 +57,32 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
                 .aiInsightEnabled(withAi)
                 .total(recommendations.size())
                 .build();
+    }
+
+    /**
+     * Gọi Elasticsearch trong transaction độc lập (REQUIRES_NEW) để tránh
+     * "rollback-only" contamination khi ResourceNotFoundException được throw
+     * bên trong @Transactional(readOnly=true) của suggestSimilarProducts.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, readOnly = true)
+    public List<ProductSearchItemResponse> fetchFromElasticsearch(Long productId, int size) {
+        try {
+            ProductSearchPageResponse page = productSearchService.suggestSimilarProducts(
+                    productId, 0, size, true
+            );
+            List<ProductSearchItemResponse> results = page.getContent() == null ? List.of() : page.getContent();
+            log.debug("[recommendation] KNN found {} results for productId={}", results.size(), productId);
+            return results;
+        } catch (com.badminton.shop.exception.ResourceNotFoundException ex) {
+            log.debug("[recommendation] Product {} not in Elasticsearch index, will use DB fallback", productId);
+            return List.of();
+        } catch (IllegalStateException ex) {
+            log.debug("[recommendation] Product {} has no vector, will use DB fallback: {}", productId, ex.getMessage());
+            return List.of();
+        } catch (Exception ex) {
+            log.debug("[recommendation] KNN failed for productId={}, will use DB fallback: {}", productId, ex.getMessage());
+            return List.of();
+        }
     }
 
     /**
