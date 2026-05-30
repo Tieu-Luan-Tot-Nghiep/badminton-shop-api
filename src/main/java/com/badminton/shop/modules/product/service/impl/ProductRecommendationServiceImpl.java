@@ -24,22 +24,27 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
     public ProductRecommendationResponse getRecommendations(Long productId, int size, boolean withAi) {
         int safeSize = Math.min(Math.max(size, 1), 20);
 
-        // Lấy sản phẩm nguồn từ Elasticsearch để biết tên
+        // Lấy tên sản phẩm nguồn từ Elasticsearch
         String sourceProductName = resolveSourceProductName(productId);
 
         // Dùng KNN vector similarity để tìm sản phẩm tương tự
-        List<ProductSearchItemResponse> recommendations;
+        List<ProductSearchItemResponse> recommendations = List.of();
         try {
             ProductSearchPageResponse page = productSearchService.suggestSimilarProducts(
                     productId, 0, safeSize, true
             );
             recommendations = page.getContent() == null ? List.of() : page.getContent();
+        } catch (com.badminton.shop.exception.ResourceNotFoundException ex) {
+            // Sản phẩm chưa được index vào Elasticsearch → trả về rỗng, không throw 500
+            log.warn("[recommendation] Product {} not found in Elasticsearch index, returning empty recommendations", productId);
+        } catch (IllegalStateException ex) {
+            // Sản phẩm không có vector embedding → trả về rỗng
+            log.warn("[recommendation] Product {} has no valid vector, returning empty recommendations: {}", productId, ex.getMessage());
         } catch (Exception ex) {
-            log.warn("[recommendation] KNN search failed for productId={}, falling back to empty list", productId, ex);
-            recommendations = List.of();
+            log.warn("[recommendation] KNN search failed for productId={}: {}", productId, ex.getMessage());
         }
 
-        // AI insight (optional, chỉ gọi khi withAi=true)
+        // AI insight (optional, chỉ gọi khi withAi=true và có kết quả)
         String aiInsight = null;
         if (withAi && !recommendations.isEmpty()) {
             aiInsight = generateAiInsight(sourceProductName, recommendations);
@@ -57,14 +62,12 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
 
     private String resolveSourceProductName(Long productId) {
         try {
-            // Thử lấy từ Elasticsearch index
-            ProductSearchPageResponse page = productSearchService.searchProducts(
-                    null, null, null, null, null,
-                    "createdAt", "desc", 0, 1, null, false
-            );
-            // Tìm trong index bằng cách dùng suggestSimilarProducts để lấy document
-            // Nếu không tìm được thì dùng ID làm fallback
-            return "Sản phẩm #" + productId;
+            // Tìm trực tiếp trong Elasticsearch index bằng ID
+            return productSearchService.suggestSimilarProducts(productId, 0, 1, null)
+                    .getContent().stream()
+                    .findFirst()
+                    .map(item -> "Sản phẩm #" + productId)
+                    .orElse("Sản phẩm #" + productId);
         } catch (Exception ex) {
             return "Sản phẩm #" + productId;
         }

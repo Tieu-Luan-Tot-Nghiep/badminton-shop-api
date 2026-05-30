@@ -253,16 +253,33 @@ public class PromotionServiceImpl implements PromotionService {
         String normalizedCode = normalizeCode(code);
         String cacheKey = PROMOTION_CODE_CACHE_PREFIX + normalizedCode;
 
+        // Chỉ cache ID để tránh lỗi deserialize complex object từ Redis
         Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached instanceof PromotionResponse cachedResponse) {
-            return promotionRepository.findById(cachedResponse.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with code: " + normalizedCode));
+        if (cached != null) {
+            try {
+                Long promotionId = null;
+                if (cached instanceof Long id) {
+                    promotionId = id;
+                } else if (cached instanceof Integer id) {
+                    promotionId = id.longValue();
+                } else if (cached instanceof String idStr) {
+                    promotionId = Long.parseLong(idStr);
+                }
+                if (promotionId != null) {
+                    return promotionRepository.findById(promotionId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with code: " + normalizedCode));
+                }
+            } catch (Exception ex) {
+                // Cache hit nhưng parse lỗi → xóa cache và query DB
+                redisTemplate.delete(cacheKey);
+            }
         }
 
         Promotion promotion = promotionRepository.findByCodeIgnoreCase(normalizedCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with code: " + normalizedCode));
 
-        redisTemplate.opsForValue().set(cacheKey, toResponse(promotion), Duration.ofMinutes(promotionCacheTtlMinutes));
+        // Cache chỉ ID, không cache toàn bộ object
+        redisTemplate.opsForValue().set(cacheKey, promotion.getId(), Duration.ofMinutes(promotionCacheTtlMinutes));
         return promotion;
     }
 
