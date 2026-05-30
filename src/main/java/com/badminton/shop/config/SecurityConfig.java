@@ -79,7 +79,7 @@ public class SecurityConfig {
                             "/api/products/new",
                             "/api/products/compare",
                             "/api/products/search/existsBySlug",
-                            "/api/products/**/recommendations"
+                            "/api/products/*/recommendations"
                         ).permitAll()
                         // Search — public
                         .requestMatchers(HttpMethod.GET,
