@@ -1,14 +1,18 @@
 package com.badminton.shop.modules.product.service.impl;
 
+import com.badminton.shop.modules.chatbot.service.GeminiClientService;
 import com.badminton.shop.modules.product.dto.ProductRecommendationResponse;
+import com.badminton.shop.modules.product.entity.Product;
+import com.badminton.shop.modules.product.repository.ProductRepository;
 import com.badminton.shop.modules.product.service.ProductRecommendationService;
 import com.badminton.shop.modules.search.dto.ProductSearchItemResponse;
 import com.badminton.shop.modules.search.dto.ProductSearchPageResponse;
 import com.badminton.shop.modules.search.service.ProductSearchService;
-import com.badminton.shop.modules.chatbot.service.GeminiClientService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,32 +23,43 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
 
     private final ProductSearchService productSearchService;
     private final GeminiClientService geminiClientService;
+    private final ProductRepository productRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public ProductRecommendationResponse getRecommendations(Long productId, int size, boolean withAi) {
         int safeSize = Math.min(Math.max(size, 1), 20);
 
-        // Lấy tên sản phẩm nguồn từ Elasticsearch
-        String sourceProductName = resolveSourceProductName(productId);
+        // Lấy thông tin sản phẩm nguồn từ DB
+        Product sourceProduct = productRepository.findById(productId).orElse(null);
+        String sourceProductName = sourceProduct != null ? sourceProduct.getName() : "Sản phẩm #" + productId;
 
-        // Dùng KNN vector similarity để tìm sản phẩm tương tự
         List<ProductSearchItemResponse> recommendations = List.of();
+
+        // Tầng 1: KNN vector similarity từ Elasticsearch (nếu đã reindex)
         try {
             ProductSearchPageResponse page = productSearchService.suggestSimilarProducts(
                     productId, 0, safeSize, true
             );
-            recommendations = page.getContent() == null ? List.of() : page.getContent();
+            List<ProductSearchItemResponse> esResults = page.getContent() == null ? List.of() : page.getContent();
+            if (!esResults.isEmpty()) {
+                recommendations = esResults;
+                log.debug("[recommendation] KNN found {} results for productId={}", esResults.size(), productId);
+            }
         } catch (com.badminton.shop.exception.ResourceNotFoundException ex) {
-            // Sản phẩm chưa được index vào Elasticsearch → trả về rỗng, không throw 500
-            log.warn("[recommendation] Product {} not found in Elasticsearch index, returning empty recommendations", productId);
+            log.debug("[recommendation] Product {} not in Elasticsearch index, using DB fallback", productId);
         } catch (IllegalStateException ex) {
-            // Sản phẩm không có vector embedding → trả về rỗng
-            log.warn("[recommendation] Product {} has no valid vector, returning empty recommendations: {}", productId, ex.getMessage());
+            log.debug("[recommendation] Product {} has no vector, using DB fallback: {}", productId, ex.getMessage());
         } catch (Exception ex) {
-            log.warn("[recommendation] KNN search failed for productId={}: {}", productId, ex.getMessage());
+            log.debug("[recommendation] KNN failed for productId={}, using DB fallback: {}", productId, ex.getMessage());
         }
 
-        // AI insight (optional, chỉ gọi khi withAi=true và có kết quả)
+        // Tầng 2: DB fallback — cùng category
+        if (recommendations.isEmpty() && sourceProduct != null) {
+            recommendations = fetchFromDb(sourceProduct, safeSize);
+        }
+
+        // AI insight (optional)
         String aiInsight = null;
         if (withAi && !recommendations.isEmpty()) {
             aiInsight = generateAiInsight(sourceProductName, recommendations);
@@ -60,17 +75,54 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
                 .build();
     }
 
-    private String resolveSourceProductName(Long productId) {
-        try {
-            // Tìm trực tiếp trong Elasticsearch index bằng ID
-            return productSearchService.suggestSimilarProducts(productId, 0, 1, null)
-                    .getContent().stream()
-                    .findFirst()
-                    .map(item -> "Sản phẩm #" + productId)
-                    .orElse("Sản phẩm #" + productId);
-        } catch (Exception ex) {
-            return "Sản phẩm #" + productId;
+    /**
+     * Fallback: lấy sản phẩm cùng category từ DB.
+     * Nếu cùng category không đủ, bổ sung bằng sản phẩm mới nhất.
+     */
+    private List<ProductSearchItemResponse> fetchFromDb(Product sourceProduct, int size) {
+        Long categoryId = sourceProduct.getCategory() != null ? sourceProduct.getCategory().getId() : null;
+
+        List<Product> dbProducts;
+        if (categoryId != null) {
+            dbProducts = productRepository.findSameCategoryProducts(
+                    categoryId, sourceProduct.getId(), PageRequest.of(0, size)
+            );
+            log.debug("[recommendation] DB same-category found {} results for productId={}", dbProducts.size(), sourceProduct.getId());
+
+            // Bổ sung nếu chưa đủ size
+            if (dbProducts.size() < size) {
+                int remaining = size - dbProducts.size();
+                List<Long> excludeIds = dbProducts.stream().map(Product::getId).toList();
+                List<Product> extra = productRepository.findRecentProductsExcluding(
+                        sourceProduct.getId(), PageRequest.of(0, remaining + excludeIds.size())
+                ).stream()
+                        .filter(p -> !excludeIds.contains(p.getId()))
+                        .limit(remaining)
+                        .toList();
+                dbProducts = new java.util.ArrayList<>(dbProducts);
+                dbProducts.addAll(extra);
+            }
+        } else {
+            dbProducts = productRepository.findRecentProductsExcluding(
+                    sourceProduct.getId(), PageRequest.of(0, size)
+            );
         }
+
+        return dbProducts.stream().map(this::toSearchItem).toList();
+    }
+
+    private ProductSearchItemResponse toSearchItem(Product product) {
+        return ProductSearchItemResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .slug(product.getSlug())
+                .shortDescription(product.getShortDescription())
+                .thumbnailUrl(product.getThumbnailUrl())
+                .basePrice(product.getBasePrice() == null ? null : product.getBasePrice().doubleValue())
+                .brandName(product.getBrand() != null ? product.getBrand().getName() : null)
+                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .isActive(product.getIsActive())
+                .build();
     }
 
     private String generateAiInsight(String sourceProductName, List<ProductSearchItemResponse> recommendations) {
@@ -97,7 +149,7 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
 
             return geminiClientService.generateAnswer(prompt);
         } catch (Exception ex) {
-            log.warn("[recommendation] AI insight generation failed for source='{}': {}", sourceProductName, ex.getMessage());
+            log.warn("[recommendation] AI insight generation failed: {}", ex.getMessage());
             return null;
         }
     }

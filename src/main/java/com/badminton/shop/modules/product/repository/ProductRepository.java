@@ -124,6 +124,38 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                                 """)
                 List<Product> findNewestProducts(Pageable pageable);
 
+    @Query("""
+            SELECT p FROM Product p
+            JOIN p.category c
+            JOIN p.brand b
+            WHERE p.isActive = true
+              AND c.isDeleted = false
+              AND b.isDeleted = false
+              AND c.id = :categoryId
+              AND p.id <> :excludeProductId
+            ORDER BY p.createdAt DESC
+            """)
+    List<Product> findSameCategoryProducts(
+            @Param("categoryId") Long categoryId,
+            @Param("excludeProductId") Long excludeProductId,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT p FROM Product p
+            JOIN p.category c
+            JOIN p.brand b
+            WHERE p.isActive = true
+              AND c.isDeleted = false
+              AND b.isDeleted = false
+              AND p.id <> :excludeProductId
+            ORDER BY p.createdAt DESC
+            """)
+    List<Product> findRecentProductsExcluding(
+            @Param("excludeProductId") Long excludeProductId,
+            Pageable pageable
+    );
+
                     @Query("""
                             SELECT DISTINCT p FROM Product p
                             LEFT JOIN FETCH p.variants v
