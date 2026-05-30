@@ -206,79 +206,101 @@ public class ChatbotServiceImpl implements ChatbotService {
             maxPrice = BigDecimal.valueOf(Math.round(budget * 1.2));
         }
 
-        // Extract category and brand to filter correctly
         String categorySlug = extractCategorySlug(rawQuestion);
         String brandSlug = extractBrandSlug(rawQuestion);
 
-        // Build a clean keyword: strip brand name if category is known
-        // to avoid brand-only matches (e.g. "Lining" matching wristbands)
-        String keyword = buildCleanKeyword(rawQuestion, categorySlug);
+        // Keyword chính xác theo loại sản phẩm (không dùng toàn bộ câu hỏi)
+        String cleanKeyword = buildCleanKeyword(rawQuestion, categorySlug);
 
         try {
-            // Primary: lexical search with category + brand filter
-            ProductSearchPageResponse lexicalPage = productSearchService.searchProducts(
-                    keyword,
-                    categorySlug,
-                    brandSlug,
-                    minPrice,
-                    maxPrice,
-                    "createdAt",
-                    "desc",
-                    0,
-                    3,
-                    true,
-                    false
-            );
+            // Tầng 1: keyword sạch + category slug + brand slug
+            List<ProductSearchItemResponse> result = searchProducts(cleanKeyword, categorySlug, brandSlug, minPrice, maxPrice, false);
+            if (!result.isEmpty()) return result;
 
-            List<ProductSearchItemResponse> lexicalItems = lexicalPage.getContent() == null
-                    ? List.of()
-                    : lexicalPage.getContent();
-            if (!lexicalItems.isEmpty()) {
-                return lexicalItems;
-            }
-
-            // Fallback 1: relax brand filter, keep category
+            // Tầng 2: bỏ brand, giữ category slug
             if (brandSlug != null) {
-                ProductSearchPageResponse noBrandPage = productSearchService.searchProducts(
-                        keyword,
-                        categorySlug,
-                        null,
-                        minPrice,
-                        maxPrice,
-                        "createdAt",
-                        "desc",
-                        0,
-                        3,
-                        true,
-                        false
-                );
-                List<ProductSearchItemResponse> noBrandItems = noBrandPage.getContent() == null
-                        ? List.of()
-                        : noBrandPage.getContent();
-                if (!noBrandItems.isEmpty()) {
-                    return noBrandItems;
-                }
+                result = searchProducts(cleanKeyword, categorySlug, null, minPrice, maxPrice, false);
+                if (!result.isEmpty()) return result;
             }
 
-            // Fallback 2: semantic search with category filter
-            ProductSearchPageResponse semanticPage = productSearchService.searchProducts(
-                    keyword,
-                    categorySlug,
-                    null,
-                    minPrice,
-                    maxPrice,
-                    "createdAt",
-                    "desc",
-                    0,
-                    3,
-                    true,
-                    true
-            );
-            return semanticPage.getContent() == null ? List.of() : semanticPage.getContent();
+            // Tầng 3: bỏ category slug (slug có thể sai), chỉ dùng keyword chính xác
+            // Đây là tầng quan trọng nhất khi slug không khớp DB
+            result = searchProducts(cleanKeyword, null, null, minPrice, maxPrice, false);
+            if (!result.isEmpty()) return result;
+
+            // Tầng 4: semantic search với keyword sạch (không có category filter)
+            result = searchProducts(cleanKeyword, null, null, minPrice, maxPrice, true);
+            if (!result.isEmpty()) return result;
+
+            // Tầng 5: fallback toàn bộ câu hỏi (last resort)
+            if (!rawQuestion.equals(cleanKeyword)) {
+                result = searchProducts(rawQuestion, null, null, minPrice, maxPrice, false);
+                if (!result.isEmpty()) return result;
+            }
+
+            return List.of();
         } catch (Exception ex) {
-            log.warn("Product retrieval failed for query: {}", retrievalQuery, ex);
+            log.warn("[chatbot] Product retrieval failed for query='{}': {}", cleanKeyword, ex.getMessage());
             return List.of();
         }
+    }
+
+    private List<ProductSearchItemResponse> searchProducts(
+            String keyword, String categorySlug, String brandSlug,
+            BigDecimal minPrice, BigDecimal maxPrice, boolean semantic) {
+        try {
+            ProductSearchPageResponse page = productSearchService.searchProducts(
+                    keyword, categorySlug, brandSlug, minPrice, maxPrice,
+                    "createdAt", "desc", 0, 3, true, semantic
+            );
+            List<ProductSearchItemResponse> items = page.getContent();
+            if (items == null || items.isEmpty()) return List.of();
+
+            // Lọc kết quả: nếu có category intent, loại bỏ sản phẩm không đúng loại
+            String categoryIntent = extractCategoryIntent(keyword);
+            if (categoryIntent != null) {
+                List<ProductSearchItemResponse> filtered = items.stream()
+                        .filter(item -> isCategoryMatch(item, categoryIntent))
+                        .toList();
+                // Chỉ dùng filtered nếu có kết quả, tránh trả về rỗng
+                if (!filtered.isEmpty()) return filtered;
+            }
+
+            return items;
+        } catch (Exception ex) {
+            log.debug("[chatbot] Search failed keyword='{}' category='{}': {}", keyword, categorySlug, ex.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Trích xuất intent loại sản phẩm từ keyword để post-filter kết quả.
+     * Trả về null nếu không detect được.
+     */
+    private String extractCategoryIntent(String keyword) {
+        if (keyword == null) return null;
+        String n = normalize(keyword);
+        if (n.contains("vot")) return "vot";
+        if (n.contains("giay")) return "giay";
+        if (n.contains("tui") || n.contains("balo")) return "tui";
+        if (n.contains("ao") || n.contains("quan")) return "ao";
+        return null;
+    }
+
+    /**
+     * Kiểm tra sản phẩm có đúng loại với intent không.
+     * Dựa vào categoryName hoặc tên sản phẩm.
+     */
+    private boolean isCategoryMatch(ProductSearchItemResponse item, String categoryIntent) {
+        String name = normalize(item.getName() != null ? item.getName() : "");
+        String cat = normalize(item.getCategoryName() != null ? item.getCategoryName() : "");
+        return switch (categoryIntent) {
+            case "vot" -> name.contains("vot") || cat.contains("vot");
+            case "giay" -> name.contains("giay") || cat.contains("giay");
+            case "tui" -> name.contains("tui") || name.contains("balo") || cat.contains("tui");
+            case "ao" -> (name.contains("ao") || name.contains("quan")) && !name.contains("vot");
+            default -> true;
+        };
     }
 
     /**
