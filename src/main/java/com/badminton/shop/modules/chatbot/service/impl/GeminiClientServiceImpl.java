@@ -20,9 +20,9 @@ import java.util.Map;
 public class GeminiClientServiceImpl implements GeminiClientService {
 
     private static final String FIXED_API_VERSION = "v1beta";
-    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 1024;
-    private static final int CONTINUATION_MAX_OUTPUT_TOKENS = 1536;
-    private static final int MIN_REASONABLE_ANSWER_LENGTH = 220;
+    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 1536;
+    private static final int CONTINUATION_MAX_OUTPUT_TOKENS = 2048;
+    private static final int MIN_REASONABLE_ANSWER_LENGTH = 400;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
@@ -33,7 +33,7 @@ public class GeminiClientServiceImpl implements GeminiClientService {
     @Value("${app.chatbot.gemini.model:gemini-2.0-flash}")
     private String geminiModel;
 
-    @Value("${app.chatbot.gemini.enable-continuation:false}")
+    @Value("${app.chatbot.gemini.enable-continuation:true}")
     private boolean continuationEnabled;
 
     public GeminiClientServiceImpl(

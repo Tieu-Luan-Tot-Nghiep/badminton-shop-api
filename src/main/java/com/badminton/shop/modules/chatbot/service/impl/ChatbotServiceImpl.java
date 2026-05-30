@@ -206,11 +206,20 @@ public class ChatbotServiceImpl implements ChatbotService {
             maxPrice = BigDecimal.valueOf(Math.round(budget * 1.2));
         }
 
+        // Extract category and brand to filter correctly
+        String categorySlug = extractCategorySlug(rawQuestion);
+        String brandSlug = extractBrandSlug(rawQuestion);
+
+        // Build a clean keyword: strip brand name if category is known
+        // to avoid brand-only matches (e.g. "Lining" matching wristbands)
+        String keyword = buildCleanKeyword(rawQuestion, categorySlug);
+
         try {
+            // Primary: lexical search with category + brand filter
             ProductSearchPageResponse lexicalPage = productSearchService.searchProducts(
-                    retrievalQuery,
-                    null,
-                    null,
+                    keyword,
+                    categorySlug,
+                    brandSlug,
                     minPrice,
                     maxPrice,
                     "createdAt",
@@ -228,9 +237,33 @@ public class ChatbotServiceImpl implements ChatbotService {
                 return lexicalItems;
             }
 
+            // Fallback 1: relax brand filter, keep category
+            if (brandSlug != null) {
+                ProductSearchPageResponse noBrandPage = productSearchService.searchProducts(
+                        keyword,
+                        categorySlug,
+                        null,
+                        minPrice,
+                        maxPrice,
+                        "createdAt",
+                        "desc",
+                        0,
+                        3,
+                        true,
+                        false
+                );
+                List<ProductSearchItemResponse> noBrandItems = noBrandPage.getContent() == null
+                        ? List.of()
+                        : noBrandPage.getContent();
+                if (!noBrandItems.isEmpty()) {
+                    return noBrandItems;
+                }
+            }
+
+            // Fallback 2: semantic search with category filter
             ProductSearchPageResponse semanticPage = productSearchService.searchProducts(
-                    retrievalQuery,
-                    null,
+                    keyword,
+                    categorySlug,
                     null,
                     minPrice,
                     maxPrice,
@@ -246,6 +279,26 @@ public class ChatbotServiceImpl implements ChatbotService {
             log.warn("Product retrieval failed for query: {}", retrievalQuery, ex);
             return List.of();
         }
+    }
+
+    /**
+     * Build a clean keyword for search.
+     * When category is known, use only the product-type word (e.g. "vợt")
+     * instead of the full question to avoid brand-only matches.
+     */
+    private String buildCleanKeyword(String rawQuestion, String categorySlug) {
+        if (categorySlug == null) {
+            return rawQuestion;
+        }
+        // Map category slug back to a representative keyword
+        return switch (categorySlug) {
+            case "vot-cau-long" -> "vợt cầu lông";
+            case "giay-cau-long" -> "giày cầu lông";
+            case "cau-long" -> "cầu lông";
+            case "tui-cau-long" -> "túi cầu lông";
+            case "ao-quan-cau-long" -> "áo quần cầu lông";
+            default -> rawQuestion;
+        };
     }
 
     private boolean isLikelyProductIntent(String rawQuestion) {
@@ -270,6 +323,53 @@ public class ChatbotServiceImpl implements ChatbotService {
                 || normalized.contains("tu van")
                 || normalized.contains("chon")
                 || normalized.contains("san pham");
+    }
+
+    /**
+     * Extract category slug hint from question to filter search results.
+     * Returns null if no specific category can be inferred.
+     * NOTE: slugs must match actual category slugs in the database.
+     */
+    private String extractCategorySlug(String rawQuestion) {
+        if (rawQuestion == null || rawQuestion.isBlank()) {
+            return null;
+        }
+        String normalized = normalize(rawQuestion);
+
+        // Racket keywords → category slug "vot-cau-long"
+        if (normalized.contains("vot") || normalized.contains("racket")) {
+            return "vot-cau-long";
+        }
+        // Shoes keywords → category slug "giay-cau-long"
+        if (normalized.contains("giay") || normalized.contains("shoe")) {
+            return "giay-cau-long";
+        }
+        // Bag keywords → category slug "tui-cau-long"
+        if (normalized.contains("tui") || normalized.contains("balo") || normalized.contains("bag")) {
+            return "tui-cau-long";
+        }
+        // Apparel keywords → category slug "ao-quan-cau-long"
+        if (normalized.contains("ao") || normalized.contains("quan") || normalized.contains("shirt")
+                || normalized.contains("short")) {
+            return "ao-quan-cau-long";
+        }
+        return null;
+    }
+
+    /**
+     * Extract brand slug hint from question.
+     */
+    private String extractBrandSlug(String rawQuestion) {
+        if (rawQuestion == null || rawQuestion.isBlank()) {
+            return null;
+        }
+        String normalized = normalize(rawQuestion);
+        if (normalized.contains("yonex")) return "yonex";
+        if (normalized.contains("victor")) return "victor";
+        if (normalized.contains("lining") || normalized.contains("li-ning")) return "lining";
+        if (normalized.contains("apacs")) return "apacs";
+        if (normalized.contains("kawasaki")) return "kawasaki";
+        return null;
     }
 
     private String buildRetrievalQuery(String question, String recalledMemory) {

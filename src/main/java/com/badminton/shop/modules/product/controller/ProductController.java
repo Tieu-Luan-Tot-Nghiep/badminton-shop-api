@@ -5,12 +5,14 @@ import com.badminton.shop.modules.product.dto.PagedResponse;
 import com.badminton.shop.modules.product.dto.ProductImageRequest;
 import com.badminton.shop.modules.product.dto.ProductImageResponse;
 import com.badminton.shop.modules.product.dto.ProductListResponse;
+import com.badminton.shop.modules.product.dto.ProductRecommendationResponse;
 import com.badminton.shop.modules.product.dto.ProductRequest;
 import com.badminton.shop.modules.product.dto.ProductResponse;
 import com.badminton.shop.modules.product.dto.ProductCompareResponse;
 import com.badminton.shop.modules.product.dto.ProductVariantRequest;
 import com.badminton.shop.modules.product.dto.ProductVariantResponse;
 import com.badminton.shop.modules.product.dto.WishlistItemResponse;
+import com.badminton.shop.modules.product.service.ProductRecommendationService;
 import com.badminton.shop.modules.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ import java.util.Collections;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductRecommendationService productRecommendationService;
 
     // ===== Public APIs =====
 
@@ -93,6 +96,15 @@ public class ProductController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getProductById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Product fetched successfully.", productService.getPublicProductById(id)));
+    }
+
+    @GetMapping("/{id}/recommendations")
+    public ResponseEntity<ApiResponse<ProductRecommendationResponse>> getProductRecommendations(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "6") int size,
+            @RequestParam(defaultValue = "false") boolean withAi) {
+        ProductRecommendationResponse response = productRecommendationService.getRecommendations(id, size, withAi);
+        return ResponseEntity.ok(ApiResponse.success("Product recommendations fetched successfully.", response));
     }
 
     @GetMapping("/featured")

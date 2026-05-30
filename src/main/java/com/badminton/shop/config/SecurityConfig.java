@@ -78,7 +78,8 @@ public class SecurityConfig {
                             "/api/products/featured",
                             "/api/products/new",
                             "/api/products/compare",
-                            "/api/products/search/existsBySlug"
+                            "/api/products/search/existsBySlug",
+                            "/api/products/**/recommendations"
                         ).permitAll()
                         // Search — public
                         .requestMatchers(HttpMethod.GET,
@@ -88,19 +89,21 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/search/products/by-image").permitAll()
                         // Categories & Brands — public
                         .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/brands/**").permitAll()
-                        // Reviews — public (đọc), riêng /my cần auth (đã khai báo trên)
-                        .requestMatchers(HttpMethod.GET, "/api/reviews/*", "/api/reviews/products/**").permitAll()
-                        // Promotions — validate và xem mã là public
+                        // Reviews — public (đọc): by id, by product, summary; riêng /my cần auth
+                        .requestMatchers(HttpMethod.GET,
+                            "/api/reviews/*",
+                            "/api/reviews/products/**"
+                        ).permitAll()
+                        // Promotions — list active và xem theo code là public; validate cũng public
                         .requestMatchers(HttpMethod.GET, "/api/promotions", "/api/promotions/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/promotions/validate").permitAll()
-                        // Shipping — địa chỉ giao hàng là public (cần khi checkout)
+                        // Shipping — provinces/districts/wards public (cần khi điền địa chỉ)
+                        // NOTE: /api/shipping/orders/{code} KHÔNG public (thông tin đơn hàng nhạy cảm)
                         .requestMatchers(HttpMethod.GET,
                             "/api/shipping/provinces",
                             "/api/shipping/provinces/*/districts",
                             "/api/shipping/districts/*/wards"
                         ).permitAll()
-                        // Cart — public (guest cart)
-                        .requestMatchers(HttpMethod.GET, "/api/cart", "/api/cart/**").permitAll()
                         // WebSocket chat
                         .requestMatchers("/ws-chat/**").permitAll()
                         .anyRequest().authenticated()

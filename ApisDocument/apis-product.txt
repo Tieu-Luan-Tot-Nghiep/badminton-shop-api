@@ -124,6 +124,45 @@
   - `productImages` chứa các ảnh tham chiếu theo màu (`imageUrl`, `color`, `isMain`).
   - `productVariants` cung cấp mỗi tổ hợp màu + size (`sku`, `color`, `size`, `price`, `stock`).
 
+### 3.2.1. Get Product Recommendations
+- **URL**: `/api/products/{id}/recommendations`
+- **Method**: `GET`
+- **Description**: Gợi ý sản phẩm tương tự khi xem chi tiết sản phẩm. Dùng KNN vector similarity (Elasticsearch) + AI insight tùy chọn.
+- **Authentication**: Không yêu cầu.
+- **Path Parameters**: `id` (Long) - ID sản phẩm đang xem.
+- **Query Parameters**:
+  - `size` (int, default `6`, max `20`) — Số lượng sản phẩm gợi ý.
+  - `withAi` (Boolean, default `false`) — Kèm AI insight giải thích lý do gợi ý (tốn thêm ~1-2s latency).
+- **Success Response** (200 OK):
+  ```json
+  {
+    "message": "Product recommendations fetched successfully.",
+    "data": {
+      "sourceProductId": 101,
+      "sourceProductName": "Vợt Yonex Astrox 88D Pro",
+      "recommendations": [
+        {
+          "id": 102,
+          "name": "Vợt Yonex Astrox 99 Pro",
+          "slug": "vot-yonex-astrox-99-pro",
+          "basePrice": 4500000.0,
+          "brandName": "Yonex",
+          "categoryName": "Vợt cầu lông",
+          "thumbnailUrl": "https://...",
+          "isActive": true
+        }
+      ],
+      "aiInsight": "Những sản phẩm này được gợi ý vì cùng phân khúc vợt tấn công cao cấp của Yonex, phù hợp cho người chơi trung-nâng cấp muốn khám phá thêm lựa chọn trong cùng dòng sản phẩm.",
+      "aiInsightEnabled": true,
+      "total": 6
+    }
+  }
+  ```
+- **Notes**:
+  - Khi `withAi=false` (default): `aiInsight` sẽ là `null`, response nhanh hơn.
+  - Khi `withAi=true`: Gemini AI sẽ tạo 2-3 câu giải thích lý do gợi ý.
+  - Gợi ý dựa trên semantic vector similarity — sản phẩm cùng loại, cùng brand, cùng phân khúc giá sẽ được ưu tiên.
+
 ### 3.3. Create Product
 - **URL**: `/api/products`
 - **Method**: `POST`
