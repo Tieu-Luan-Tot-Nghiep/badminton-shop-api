@@ -224,6 +224,7 @@ public class OrderServiceImpl implements OrderService {
         String paymentUrl = null;
         if (paymentMethod == PaymentMethod.VNPAY) {
             paymentUrl = buildVnpayPaymentUrl(saved);
+            log.info("[vnpay] Created payment URL for orderCode={}: {}", saved.getOrderCode(), paymentUrl);
         }
 
         if (saved.getStatus() == OrderStatus.CONFIRMED) {
