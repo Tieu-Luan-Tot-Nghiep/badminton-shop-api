@@ -69,7 +69,12 @@ public class SecurityConfig {
                         // Authenticated-only endpoints
                         .requestMatchers(HttpMethod.GET, "/api/reviews/my").authenticated()
                         // VNPay callbacks — public (gọi từ cổng thanh toán)
-                        .requestMatchers(HttpMethod.GET, "/api/orders/vnpay-return", "/api/orders/vnpay-ipn").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                            "/api/orders/vnpay-return",
+                            "/api/orders/vnpay-ipn",
+                            "/api/payment/vnpay-callback",
+                            "/api/payment/vnpay-ipn"
+                        ).permitAll()
                         // Products — public
                         .requestMatchers(HttpMethod.GET,
                             "/api/products",
