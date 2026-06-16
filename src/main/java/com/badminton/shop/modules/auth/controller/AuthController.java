@@ -100,6 +100,15 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Cap nhat thong tin ca nhan thanh cong.", null));
     }
 
+    @PutMapping("/fcm-token")
+    public ResponseEntity<ApiResponse<Object>> updateFcmToken(
+            @RequestBody Map<String, String> request,
+            Principal principal) {
+        String fcmToken = request.get("fcmToken");
+        authService.updateFcmToken(principal.getName(), fcmToken);
+        return ResponseEntity.ok(ApiResponse.success("Cap nhat FCM Token thanh cong.", null));
+    }
+
     @PostMapping("/profile/avatar")
     public ResponseEntity<ApiResponse<Object>> updateAvatar(Principal principal, @RequestParam("file") MultipartFile file) {
         authService.updateAvatar(principal.getName(), file);

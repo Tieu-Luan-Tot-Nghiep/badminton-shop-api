@@ -52,6 +52,9 @@ public class User {
     @Column(unique = true)
     private String phoneNumber;
 
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;

@@ -14,6 +14,7 @@ public interface AuthService {
     void resetPassword(String token, String newPassword);
     void changePassword(String email, ChangePasswordRequest request);
     void updateProfile(String email, UpdateProfileRequest request);
+    void updateFcmToken(String email, String fcmToken);
     UserProfileResponse getCurrentUserProfile(String email);
 
     void updateAvatar(String email, MultipartFile file);

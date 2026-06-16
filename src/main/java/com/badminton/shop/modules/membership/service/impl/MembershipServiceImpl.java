@@ -13,6 +13,8 @@ import com.badminton.shop.modules.membership.repository.MembershipTierRepository
 import com.badminton.shop.modules.membership.repository.PointHistoryRepository;
 import com.badminton.shop.modules.membership.repository.UserMembershipRepository;
 import com.badminton.shop.modules.membership.service.MembershipService;
+import com.badminton.shop.modules.messaging.dto.FcmNotificationMessage;
+import com.badminton.shop.modules.messaging.service.FcmService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ public class MembershipServiceImpl implements MembershipService {
     private final MembershipTierRepository tierRepository;
     private final PointHistoryRepository pointHistoryRepository;
     private final UserRepository userRepository;
+    private final FcmService fcmService;
 
     // 10,000 VND = 1 point
     private static final BigDecimal POINT_CONVERSION_RATE = new BigDecimal("10000");
@@ -108,8 +111,17 @@ public class MembershipServiceImpl implements MembershipService {
             membership.setTotalPoints(membership.getTotalPoints() + pointsEarned);
 
             // Update Tier if applicable
+            MembershipTier oldTier = membership.getTier();
             tierRepository.findEligibleTierByPoints(membership.getTotalPoints())
-                    .ifPresent(membership::setTier);
+                    .ifPresent(newTier -> {
+                        if (!newTier.getId().equals(oldTier.getId())) {
+                            membership.setTier(newTier);
+                            // Push notification: lên hạng thành viên
+                            sendMembershipUpgradeNotification(membership.getUser(), newTier.getName());
+                        } else {
+                            membership.setTier(newTier);
+                        }
+                    });
 
             userMembershipRepository.save(membership);
 
@@ -120,6 +132,22 @@ public class MembershipServiceImpl implements MembershipService {
                                         .reason(REASON_EARNED_FROM_ORDER)
                     .referenceId(orderId)
                     .build());
+        }
+    }
+
+    private void sendMembershipUpgradeNotification(User user, String tierName) {
+        if (user == null || user.getFcmToken() == null || user.getFcmToken().isBlank()) {
+            return;
+        }
+        try {
+            fcmService.sendAsync(FcmNotificationMessage.builder()
+                    .fcmToken(user.getFcmToken())
+                    .title("🏆 Chúc mừng! Bạn đã lên hạng thành viên")
+                    .body("Bạn vừa đạt hạng " + tierName + ". Hãy khám phá các ưu đãi mới dành riêng cho bạn!")
+                    .data(java.util.Map.of("screen", "MEMBERSHIP", "tierName", tierName))
+                    .build());
+        } catch (Exception e) {
+            log.warn("[FCM] Không thể gửi membership upgrade notification. userId={}: {}", user.getId(), e.getMessage());
         }
     }
 

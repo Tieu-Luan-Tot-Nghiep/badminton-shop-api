@@ -1,7 +1,9 @@
 package com.badminton.shop.modules.order.consumer;
 
 import com.badminton.shop.config.RabbitMQConfig;
+import com.badminton.shop.modules.messaging.dto.FcmNotificationMessage;
 import com.badminton.shop.modules.messaging.dto.ShippingStatusChangedMessage;
+import com.badminton.shop.modules.messaging.service.FcmService;
 import com.badminton.shop.modules.order.entity.Order;
 import com.badminton.shop.modules.order.entity.OrderHistory;
 import com.badminton.shop.modules.order.entity.PaymentMethod;
@@ -15,6 +17,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -25,6 +28,7 @@ public class ShippingStatusConsumer {
 
     private final OrderRepository orderRepository;
     private final MembershipService membershipService;
+    private final FcmService fcmService;
 
     @RabbitListener(queues = RabbitMQConfig.ORDER_SHIPPING_STATUS_QUEUE)
     @Transactional
@@ -64,6 +68,26 @@ public class ShippingStatusConsumer {
                     // Shipping status processing should remain resilient.
                 }
             }
+
+            // Push notification: Giao hàng thành công
+            sendShippingNotification(order,
+                    "📦 Giao hàng thành công",
+                    "Đơn hàng #" + order.getOrderCode() + " đã được giao thành công. Cảm ơn bạn đã mua sắm!",
+                    "ORDER_DELIVERED");
+
+        } else if (mappedStatus == OrderStatus.SHIPPING) {
+            // Push notification: Đang giao hàng
+            sendShippingNotification(order,
+                    "🚚 Đơn hàng đang được giao",
+                    "Đơn hàng #" + order.getOrderCode() + " đang trên đường giao đến bạn.",
+                    "ORDER_SHIPPING");
+
+        } else if (mappedStatus == OrderStatus.CANCELLED || mappedStatus == OrderStatus.RETURNED) {
+            // Push notification: GHN báo hủy/hoàn hàng
+            sendShippingNotification(order,
+                    "⚠️ Giao hàng không thành công",
+                    "Đơn hàng #" + order.getOrderCode() + " không thể giao. Vui lòng liên hệ hỗ trợ.",
+                    "ORDER_SHIPPING_FAILED");
         }
 
         order.getHistories().add(OrderHistory.builder()
@@ -109,5 +133,26 @@ public class ShippingStatusConsumer {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void sendShippingNotification(Order order, String title, String body, String screen) {
+        try {
+            var user = order.getUser();
+            if (user == null || user.getFcmToken() == null || user.getFcmToken().isBlank()) {
+                return;
+            }
+            fcmService.sendAsync(FcmNotificationMessage.builder()
+                    .fcmToken(user.getFcmToken())
+                    .title(title)
+                    .body(body)
+                    .data(Map.of(
+                            "screen", screen,
+                            "orderCode", order.getOrderCode() != null ? order.getOrderCode() : ""
+                    ))
+                    .build());
+        } catch (Exception e) {
+            log.warn("[FCM] Không thể gửi shipping notification. orderCode={}: {}",
+                    order.getOrderCode(), e.getMessage());
+        }
     }
 }

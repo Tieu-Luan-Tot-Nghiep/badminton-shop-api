@@ -17,10 +17,12 @@ import com.badminton.shop.modules.order.dto.response.ReturnRequestResponse;
 import com.badminton.shop.modules.inventory.dto.InventoryLineRequest;
 import com.badminton.shop.modules.inventory.dto.SystemInventoryRequest;
 import com.badminton.shop.modules.inventory.service.InventoryService;
+import com.badminton.shop.modules.messaging.dto.FcmNotificationMessage;
 import com.badminton.shop.modules.messaging.dto.OrderCancelledEvent;
 import com.badminton.shop.modules.messaging.dto.OrderCancellationEmailMessage;
 import com.badminton.shop.modules.messaging.dto.OrderConfirmationEmailMessage;
 import com.badminton.shop.modules.messaging.dto.RefundRequiredMessage;
+import com.badminton.shop.modules.messaging.service.FcmService;
 import com.badminton.shop.modules.order.entity.Order;
 import com.badminton.shop.modules.order.entity.OrderHistory;
 import com.badminton.shop.modules.order.entity.OrderItem;
@@ -96,6 +98,7 @@ public class OrderServiceImpl implements OrderService {
     private final RabbitTemplate rabbitTemplate;
     private final EmailService emailService;
     private final CartService cartService;
+    private final FcmService fcmService;
 
     @Value("${vnpay.tmn-code}")
     private String vnpTmnCode;
@@ -243,6 +246,12 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             // Ignore email failure
         }
+
+        // Push notification: Đặt hàng thành công
+        sendOrderNotification(user, saved.getOrderCode(),
+                "🛒 Đặt hàng thành công",
+                "Đơn hàng #" + saved.getOrderCode() + " đã được tạo. Chúng tôi sẽ xử lý sớm nhất!",
+                "ORDER_CREATED");
         
         // Remove ordered items from user's cart
         try {
@@ -325,10 +334,22 @@ public class OrderServiceImpl implements OrderService {
                         .build());
 
                 createShippingOrderIfApplicable(order);
+
+                // Push notification: Thanh toán thành công
+                sendOrderNotification(order.getUser(), order.getOrderCode(),
+                        "✅ Thanh toán thành công",
+                        "Đơn hàng #" + order.getOrderCode() + " đã được thanh toán. Chúng tôi sẽ chuẩn bị hàng ngay!",
+                        "PAYMENT_SUCCESS");
             }
         } else {
             if (order.getPaymentStatus() == PaymentStatus.PENDING && order.getStatus() != OrderStatus.CANCELLED) {
                 cancelOrderInternal(order, "VNPAY failed with code: " + responseCode, "system");
+
+                // Push notification: Thanh toán thất bại
+                sendOrderNotification(order.getUser(), order.getOrderCode(),
+                        "❌ Thanh toán thất bại",
+                        "Thanh toán đơn hàng #" + order.getOrderCode() + " không thành công. Đơn hàng đã bị hủy.",
+                        "PAYMENT_FAILED");
             } else {
                 order.setPaymentStatus(PaymentStatus.FAILED);
                 order.getHistories().add(OrderHistory.builder()
@@ -369,6 +390,13 @@ public class OrderServiceImpl implements OrderService {
 
         cancelOrderInternal(order, reason, user.getEmail());
         Order saved = orderRepository.save(order);
+
+        // Push notification: Hủy đơn thành công
+        sendOrderNotification(user, saved.getOrderCode(),
+                "🚫 Đơn hàng đã được hủy",
+                "Đơn hàng #" + saved.getOrderCode() + " đã được hủy theo yêu cầu của bạn.",
+                "ORDER_CANCELLED");
+
         return toOrderResponse(saved, null);
     }
 
@@ -396,6 +424,13 @@ public class OrderServiceImpl implements OrderService {
 
         createShippingOrderIfApplicable(order);
         Order saved = orderRepository.save(order);
+
+        // Push notification: Admin xác nhận đơn COD
+        sendOrderNotification(saved.getUser(), saved.getOrderCode(),
+                "✅ Đơn hàng đã được xác nhận",
+                "Đơn hàng #" + saved.getOrderCode() + " đã được xác nhận và đang chuẩn bị giao hàng.",
+                "ORDER_CONFIRMED");
+
         return toOrderResponse(saved, null);
     }
 
@@ -503,6 +538,13 @@ public class OrderServiceImpl implements OrderService {
 
         OrderReturnRequest saved = orderReturnRequestRepository.save(returnRequest);
         orderRepository.save(order);
+
+        // Push notification: Admin duyệt yêu cầu trả hàng
+        sendOrderNotification(order.getUser(), order.getOrderCode(),
+                "✅ Yêu cầu trả hàng được duyệt",
+                "Yêu cầu trả hàng cho đơn #" + order.getOrderCode() + " đã được chấp nhận. Vui lòng gửi hàng về cho chúng tôi.",
+                "RETURN_APPROVED");
+
         return toReturnRequestResponse(saved);
     }
 
@@ -530,6 +572,13 @@ public class OrderServiceImpl implements OrderService {
 
         OrderReturnRequest saved = orderReturnRequestRepository.save(returnRequest);
         orderRepository.save(order);
+
+        // Push notification: Admin từ chối yêu cầu trả hàng
+        sendOrderNotification(order.getUser(), order.getOrderCode(),
+                "❌ Yêu cầu trả hàng bị từ chối",
+                "Yêu cầu trả hàng cho đơn #" + order.getOrderCode() + " không được chấp nhận. Lý do: " + note,
+                "RETURN_REJECTED");
+
         return toReturnRequestResponse(saved);
     }
 
@@ -608,6 +657,12 @@ public class OrderServiceImpl implements OrderService {
         } catch (RuntimeException ignored) {
             // Refund flow should not fail due to loyalty rollback issue.
         }
+
+        // Push notification: Hoàn tiền thành công
+        sendOrderNotification(order.getUser(), order.getOrderCode(),
+                "💰 Hoàn tiền thành công",
+                "Đơn hàng #" + order.getOrderCode() + " đã được hoàn tiền. Vui lòng kiểm tra tài khoản ngân hàng.",
+                "ORDER_REFUNDED");
 
         return toReturnRequestResponse(saved);
     }
@@ -944,6 +999,30 @@ public class OrderServiceImpl implements OrderService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    /**
+     * Gửi push notification bất đồng bộ cho user liên quan đến đơn hàng.
+     * Bỏ qua nếu user không có FCM token (chưa đăng nhập trên thiết bị di động).
+     */
+    private void sendOrderNotification(User user, String orderCode, String title, String body, String screen) {
+        if (user == null || user.getFcmToken() == null || user.getFcmToken().isBlank()) {
+            return;
+        }
+        try {
+            fcmService.sendAsync(FcmNotificationMessage.builder()
+                    .fcmToken(user.getFcmToken())
+                    .title(title)
+                    .body(body)
+                    .data(Map.of(
+                            "screen", screen,
+                            "orderCode", orderCode != null ? orderCode : ""
+                    ))
+                    .build());
+        } catch (Exception e) {
+            log.warn("[FCM] Không thể gửi notification cho user={}, orderCode={}: {}",
+                    user.getEmail(), orderCode, e.getMessage());
+        }
     }
 
     private String generateOrderCode() {

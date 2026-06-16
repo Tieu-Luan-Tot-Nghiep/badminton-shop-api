@@ -47,6 +47,11 @@ public class RabbitMQConfig {
     public static final String SEARCH_REINDEX_BATCH_QUEUE = "search.reindex.batch.queue";
     public static final String SEARCH_REINDEX_BATCH_ROUTING_KEY = "search.reindex.batch.routingKey";
 
+    // FCM Push Notification Queue
+    public static final String FCM_EXCHANGE = "fcm.exchange";
+    public static final String FCM_NOTIFICATION_QUEUE = "fcm.notification.queue";
+    public static final String FCM_NOTIFICATION_ROUTING_KEY = "fcm.notification.routingKey";
+
     @Bean
     public Queue emailVerificationQueue() {
         return new Queue(EMAIL_VERIFICATION_QUEUE, true);
@@ -100,6 +105,21 @@ public class RabbitMQConfig {
     @Bean
     public Queue orderConfirmationEmailQueue() {
         return new Queue(ORDER_CONFIRMATION_EMAIL_QUEUE, true);
+    }
+
+    @Bean
+    public Queue fcmNotificationQueue() {
+        return new Queue(FCM_NOTIFICATION_QUEUE, true);
+    }
+
+    @Bean
+    public DirectExchange fcmExchange() {
+        return new DirectExchange(FCM_EXCHANGE);
+    }
+
+    @Bean
+    public Binding fcmNotificationBinding(Queue fcmNotificationQueue, DirectExchange fcmExchange) {
+        return BindingBuilder.bind(fcmNotificationQueue).to(fcmExchange).with(FCM_NOTIFICATION_ROUTING_KEY);
     }
 
     @Bean

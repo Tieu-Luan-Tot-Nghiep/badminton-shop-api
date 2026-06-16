@@ -378,6 +378,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public void updateFcmToken(String email, String fcmToken) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
+    }
+
+    @Override
     public UserProfileResponse getCurrentUserProfile(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
