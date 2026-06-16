@@ -25,6 +25,8 @@ public interface OrderService {
 
 	Page<OrderResponse> getMyOrders(String principalName, int page, int size);
 
+	OrderResponse getMyOrderByCode(String principalName, String orderCode);
+
 	OrderResponse cancelOrderByUser(String principalName, String orderCode, String reason);
 
 	OrderResponse confirmCodOrder(String orderCode, String adminName, String note);

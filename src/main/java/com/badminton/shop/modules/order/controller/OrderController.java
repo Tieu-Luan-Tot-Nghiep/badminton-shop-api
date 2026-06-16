@@ -67,6 +67,15 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Order history fetched successfully.", response));
     }
 
+    @GetMapping("/{orderCode}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getMyOrderByCode(
+            Principal principal,
+            @PathVariable String orderCode
+    ) {
+        OrderResponse response = orderService.getMyOrderByCode(principal.getName(), orderCode);
+        return ResponseEntity.ok(ApiResponse.success("Order fetched successfully.", response));
+    }
+
     @GetMapping("/vnpay-return")
     public ResponseEntity<ApiResponse<Map<String, String>>> vnpayReturn(@RequestParam Map<String, String> params) {
         Map<String, String> response = orderService.handleVnpayReturn(params);

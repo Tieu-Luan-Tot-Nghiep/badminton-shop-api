@@ -380,6 +380,20 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getMyOrderByCode(String principalName, String orderCode) {
+        User user = getUserByPrincipal(principalName);
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+
+        if (!order.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Bạn không có quyền truy cập đơn hàng này.");
+        }
+
+        return toOrderResponse(order, null);
+    }
+
+    @Override
     public OrderResponse cancelOrderByUser(String principalName, String orderCode, String reason) {
         User user = getUserByPrincipal(principalName);
         Order order = orderRepository.findByOrderCode(orderCode)
