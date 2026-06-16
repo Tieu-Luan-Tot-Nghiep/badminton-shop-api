@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,7 +27,7 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
     private final ProductRepository productRepository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ProductRecommendationResponse getRecommendations(Long productId, int size, boolean withAi) {
         int safeSize = Math.min(Math.max(size, 1), 20);
 
@@ -59,12 +60,6 @@ public class ProductRecommendationServiceImpl implements ProductRecommendationSe
                 .build();
     }
 
-    /**
-     * Gọi Elasticsearch trong transaction độc lập (REQUIRES_NEW) để tránh
-     * "rollback-only" contamination khi ResourceNotFoundException được throw
-     * bên trong @Transactional(readOnly=true) của suggestSimilarProducts.
-     */
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, readOnly = true)
     public List<ProductSearchItemResponse> fetchFromElasticsearch(Long productId, int size) {
         try {
             ProductSearchPageResponse page = productSearchService.suggestSimilarProducts(
