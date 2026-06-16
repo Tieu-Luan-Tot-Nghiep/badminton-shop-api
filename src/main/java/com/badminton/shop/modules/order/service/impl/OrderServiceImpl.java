@@ -823,7 +823,8 @@ public class OrderServiceImpl implements OrderService {
         vnpParams.put("vnp_IpAddr", "127.0.0.1");
         vnpParams.put("vnp_CreateDate", createDate);
 
-        String hashData = buildQueryString(vnpParams, false);
+        // VNPay requires signing over the URL-encoded query string (without vnp_SecureHash).
+        String hashData = buildQueryString(vnpParams, true);
         String secureHash = hmacSHA512(vnpHashSecret, hashData);
 
         return UriComponentsBuilder.fromHttpUrl(vnpPayUrl)
@@ -847,7 +848,8 @@ public class OrderServiceImpl implements OrderService {
             signParams.put(key, value);
         }
 
-        String hashData = buildQueryString(signParams, false);
+        // Callback params are decoded by Spring; re-encode before signature validation.
+        String hashData = buildQueryString(signParams, true);
         String calculatedHash = hmacSHA512(vnpHashSecret, hashData);
         return calculatedHash.equalsIgnoreCase(receivedHash);
     }
@@ -861,10 +863,10 @@ public class OrderServiceImpl implements OrderService {
             }
 
             String key = urlEncode
-                    ? URLEncoder.encode(entry.getKey(), StandardCharsets.US_ASCII)
+                    ? URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8)
                     : entry.getKey();
             String value = urlEncode
-                    ? URLEncoder.encode(entry.getValue(), StandardCharsets.US_ASCII)
+                    ? URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8)
                     : entry.getValue();
 
             sb.append(key).append('=').append(value);
