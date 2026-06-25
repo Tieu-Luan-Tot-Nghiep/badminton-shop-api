@@ -43,7 +43,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # 👇 SỬA TẠI ĐÂY: Cho phép các container cùng mạng kết nối không bị chặn bởi pg_hba.conf
-      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_HOST_AUTH_METHOD: trust
     healthcheck:
       # Fix lỗi pg_isready khi user/db chưa kịp nhận tham số env
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
